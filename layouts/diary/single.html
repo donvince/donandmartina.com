@@ -1,0 +1,23 @@
+{{ partial "head.html" . }}
+{{ partial "nav.html" . }}
+
+<main>
+	<header>
+		<h1>{{ .Title }}</h1>
+		<p>{{ .Date.Format "2006-01-02 Monday"}} - {{ .Description }}</p>
+	</header>
+
+	<article>
+		{{ .Content }}
+	</article>
+</main>
+
+<div id="bottom-nav" class="text-center center-block">
+	<a href=" {{ .Site.BaseURL }}" class="btn btn-default"><i class="fa fa-home"></i> Home</a>
+</div>
+
+{{ if .Site.DisqusShortname }}
+  {{ template "_internal/disqus.html" . }}
+{{ end }}
+
+{{ partial "footer.html" . }}
