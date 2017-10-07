@@ -2,7 +2,6 @@
 title: "Boat Ride Along the Ljubljanica"
 description: "Honeymoon Day 11"
 date: 2016-07-22 00:00:00 +0000 UTC
-draft: true
 ---
 
 Much more chilled out day today following the busy one yesterday. Martina had

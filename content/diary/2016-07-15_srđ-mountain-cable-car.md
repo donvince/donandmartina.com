@@ -2,7 +2,6 @@
 title: "Srđ Mountain Cable Car"
 description: "Honeymoon Day 4"
 date: 2016-07-15T00:00:00+01:00
-draft: true
 ---
 
 We indulge in a late breakfast after the full previous day. The weather has

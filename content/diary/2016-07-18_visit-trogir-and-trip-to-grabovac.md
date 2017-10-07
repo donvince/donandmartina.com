@@ -2,7 +2,6 @@
 title: "Visit Trogir and Trip to Grabovac"
 description: "Honeymoon Day 7"
 date: 2016-07-18 00:00:00 +0000 UTC
-draft: true
 ---
 
 After breakfast we chat to the lady on reception we’d spoken to the least. She

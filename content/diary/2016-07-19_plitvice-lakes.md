@@ -2,7 +2,6 @@
 title: "Plitvice Lakes"
 description: "Honeymoon Day 8"
 date: 2016-07-19 00:00:00 +0000 UTC
-draft: true
 ---
 
 The alarm goes off at 5am, it’s quite stuffy and warm. We slowly potter about

@@ -2,7 +2,6 @@
 title: "Lapad Resort Life"
 description: "Honeymoon Day 2"
 date: 2016-07-13T00:00:00+01:00
-draft: true
 ---
 
 We both love continental breakfast, and this hotel has all the favourites: baby

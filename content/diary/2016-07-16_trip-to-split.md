@@ -2,7 +2,6 @@
 title: "Trip to Split"
 description: "Honeymoon Day 5"
 date: 2016-07-16 00:00:00 +0000 UTC
-draft: true
 ---
 
 We have our last breakfast at this hotel, last shower, last swim at the indoor

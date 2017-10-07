@@ -2,7 +2,6 @@
 title: "Ljubljana Walking Tours"
 description: "Honeymoon Day 10"
 date: 2016-07-21 00:00:00 +0000 UTC
-draft: true
 ---
 
 Breakfast is on the first floor, the buffet is spread across two places: the

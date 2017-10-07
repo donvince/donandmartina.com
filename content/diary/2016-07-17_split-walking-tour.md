@@ -2,7 +2,6 @@
 title: "Split Walking Tour"
 description: "Honeymoon Day 6"
 date: 2016-07-17 00:00:00 +0000 UTC
-draft: true
 ---
 
 All the excitement of our first breakfast in the new hotel: how does this toaster work? Are these corn flakes any good? Where are the spoons? We (as is perhaps customary for most of the honeymoon at this stage) take a seat outside. Smallish garden in a square behind the hotel, with a ramped, wheelchair friendly footpath cutting through diagonally from in front of a church on the left hand side to the back door towards the right; grass one side; tables and chairs the other.

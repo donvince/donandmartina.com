@@ -2,7 +2,6 @@
 title: "Visit Rastoke in Slunj and Trip to Ljubljana"
 description: "Honeymoon Day 9"
 date: 2016-07-20 00:00:00 +0000 UTC
-draft: true
 ---
 
 Nowhere near as early a start as yesterday, down to the restaurant for
