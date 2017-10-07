@@ -1,6 +1,6 @@
 ---
 title: "Srđ Mountain Cable Car"
-description: "Honeymoon Day 5"
+description: "Honeymoon Day 4"
 date: 2016-07-15T00:00:00+01:00
 draft: true
 ---
