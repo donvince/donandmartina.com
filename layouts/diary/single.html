@@ -4,7 +4,7 @@
 <main>
 	<header>
 		<h1>{{ .Title }}</h1>
-		<p>{{ .Date.Format "2006-01-02 Monday"}} - {{ .Description }}</p>
+		<p>{{ .Date.Format "2006-01-02"}} - {{ .Description }} {{ .Date.Format "Monday"}}</p>
 	</header>
 
 	<article>
