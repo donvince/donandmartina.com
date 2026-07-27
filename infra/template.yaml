@@ -163,27 +163,15 @@ Resources:
               StringEquals:
                 AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
 
-  # ── Route 53 alias records in the EXISTING hosted zone ──────────────────────
-  # Z2FDTNDATAQYW2 is CloudFront's fixed alias hosted zone id (same in all accounts).
-  ApexAliasRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: !Ref DomainName
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt CloudFrontDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2
-
-  WwwAliasRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: !Ref WwwDomainName
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt CloudFrontDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2
+  # ── DNS is NOT managed here ─────────────────────────────────────────────────
+  # The zone already has a live apex A-alias and a www CNAME (both → the old S3
+  # website endpoint) from the pre-existing site. CloudFormation cannot adopt
+  # pre-existing records, so the cutover to CloudFront is done as a deliberate,
+  # out-of-band `route53 change-resource-record-sets` UPSERT batch AFTER the
+  # distribution exists and content is synced (the conscious HTTP→CDN cutover).
+  # Use the CloudFrontDomain output below as the alias target; CloudFront's
+  # fixed alias hosted zone id is Z2FDTNDATAQYW2. The www record must switch
+  # from CNAME to an A-alias in the same batch.
 
 Outputs:
   CloudFrontDomain:
