@@ -16,7 +16,7 @@
 	<a href=" {{ .Site.BaseURL }}" class="btn btn-default"><i class="fa fa-home"></i> Home</a>
 </div>
 
-{{ if .Site.DisqusShortname }}
+{{ if .Site.Config.Services.Disqus.Shortname }}
   {{ template "_internal/disqus.html" . }}
 {{ end }}
 

@@ -1,1 +1,13 @@
+# Hugo build output
 public/
+resources/_gen/
+.hugo_build.lock
+
+# Node / Lambda
+node_modules/
+infra/lambda/**/config.js
+infra/lambda/**/*.zip
+
+# Local
+.DS_Store
+.superpowers/
