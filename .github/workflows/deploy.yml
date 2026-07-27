@@ -9,7 +9,48 @@ permissions:
   contents: read
 
 jobs:
+  # Deploy the CloudFront + ACM + DNS stack (us-east-1, where ACM for
+  # CloudFront and the later Lambda@Edge must live). Idempotent — a no-op
+  # when the template has not changed.
+  infra:
+    runs-on: ubuntu-latest
+    outputs:
+      distribution_id: ${{ steps.outputs.outputs.distribution_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy site stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/template.yaml \
+            --stack-name donandmartina-site \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --region us-east-1
+
+      - name: Read stack outputs
+        id: outputs
+        run: |
+          DIST_ID=$(aws cloudformation describe-stacks \
+            --stack-name donandmartina-site \
+            --region us-east-1 \
+            --query "Stacks[0].Outputs[?OutputKey=='CloudFrontDistributionId'].OutputValue" \
+            --output text)
+          echo "distribution_id=$DIST_ID" >> "$GITHUB_OUTPUT"
+          echo "CloudFront distribution: $DIST_ID"
+
+  # Build the Hugo site and publish it to the origin bucket, then invalidate
+  # the CDN. Depends on infra so the distribution id is available.
   deploy:
+    needs: infra
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,10 +77,10 @@ jobs:
 
       - name: Invalidate CloudFront
         env:
-          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+          DIST_ID: ${{ needs.infra.outputs.distribution_id }}
         run: |
           if [ -n "$DIST_ID" ]; then
             aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*"
           else
-            echo "no distribution id yet, skipping"
+            echo "no distribution id resolved, skipping"
           fi
