@@ -9,7 +9,11 @@ permissions:
   contents: read
 
 env:
-  ARTIFACTS_BUCKET: donandmartina-lambda-artifacts-015311074066
+  # Must be in us-east-1: Lambda fetches the zip using the function's own
+  # region, and both Lambdas here (Cognito pre-signup, Lambda@Edge auth) are
+  # us-east-1. A cross-region bucket fails with GetObjectVersion
+  # TemporaryRedirect.
+  ARTIFACTS_BUCKET: donandmartina-lambda-artifacts-us-east-1-015311074066
 
 jobs:
   # Deploy the Cognito user pool (Google IdP + pre-signup allow-list Lambda).
@@ -52,8 +56,8 @@ jobs:
       - name: Upload pre-signup zip
         id: upload_presignup
         run: |
-          aws s3 cp pre-signup.zip "s3://${ARTIFACTS_BUCKET}/pre-signup.zip" --region eu-west-1
-          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key pre-signup.zip --region eu-west-1 --query VersionId --output text)
+          aws s3 cp pre-signup.zip "s3://${ARTIFACTS_BUCKET}/pre-signup.zip" --region us-east-1
+          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key pre-signup.zip --region us-east-1 --query VersionId --output text)
           echo "version_id=$VERSION_ID" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Cognito stack
@@ -129,8 +133,8 @@ jobs:
       - name: Upload auth-edge zip
         id: upload_auth
         run: |
-          aws s3 cp auth-edge.zip "s3://${ARTIFACTS_BUCKET}/auth-edge.zip" --region eu-west-1
-          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key auth-edge.zip --region eu-west-1 --query VersionId --output text)
+          aws s3 cp auth-edge.zip "s3://${ARTIFACTS_BUCKET}/auth-edge.zip" --region us-east-1
+          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key auth-edge.zip --region us-east-1 --query VersionId --output text)
           echo "version_id=$VERSION_ID" >> "$GITHUB_OUTPUT"
 
       - name: Deploy site stack
