@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   donandmartina.com static site — private S3 origin served via CloudFront with
-  Origin Access Control (OAC) and an ACM certificate. Auth-less interim slice;
-  Cognito + Lambda@Edge are added in a later slice (see NOTEs below).
+  Origin Access Control (OAC), an ACM certificate, and a Lambda@Edge Google
+  OAuth gate backed by Cognito (see infra/cognito.yaml, deployed separately).
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DEPLOYMENT NOTES (READ BEFORE DEPLOYING)
@@ -33,12 +33,14 @@ Description: >-
 #       --bucket donandmartina.com \
 #       --region eu-west-1 --profile don-donandmartina
 #
-# * www → apex canonical redirect: intentionally NOT implemented here. A CloudFront
-#   Function and a Lambda@Edge association cannot both bind to viewer-request in the
-#   general case, and the later auth slice attaches its handler at viewer-request.
-#   To avoid that conflict, www→apex will be handled INSIDE the Lambda@Edge auth
-#   handler in the auth slice. For THIS auth-less slice both aliases (apex + www)
-#   simply serve the same CloudFront distribution / content — acceptable interim.
+# * www → apex canonical redirect: not implemented. Both aliases (apex + www)
+#   serve the same CloudFront distribution / content. A future slice could add
+#   this inside the Lambda@Edge auth handler (a CloudFront Function can't
+#   coexist with the viewer-request Lambda@Edge association below).
+#
+# * DEPLOY ORDER for this slice: infra/cognito.yaml FIRST (creates the user
+#   pool / app client the auth-edge Lambda's config.js is built from), THEN
+#   this template. Both are deployed by the same GHA workflow, in that order.
 # ─────────────────────────────────────────────────────────────────────────────
 
 Parameters:
@@ -82,6 +84,25 @@ Parameters:
     Default: eu-west-1
     Description: Region of the apex origin bucket, used to build its regional domain name.
 
+  AuthEdgeLambdaS3Bucket:
+    Type: String
+    Description: >-
+      Artifacts bucket holding the auth-edge Lambda zip (built with the
+      Cognito user pool / app client baked into config.js). Deploy this stack
+      AFTER infra/cognito.yaml so those values exist.
+
+  AuthEdgeLambdaS3Key:
+    Type: String
+    Default: auth-edge.zip
+
+  AuthEdgeLambdaS3ObjectVersion:
+    Type: String
+    Description: >-
+      S3 object version id of the zip above (artifacts bucket has versioning
+      enabled). Required so CloudFormation redeploys on code changes despite
+      the fixed key name, and so a new Lambda version is published each time
+      (Lambda@Edge associations require a version, not $LATEST).
+
 Resources:
 
   # ── ACM certificate (us-east-1, required for CloudFront) ────────────────────
@@ -108,6 +129,44 @@ Resources:
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
+
+  # ── Auth Lambda@Edge (viewer-request: JWT check, /callback, index rewrite) ──
+  # Must live in us-east-1 (this stack's region) — Lambda@Edge requirement.
+  AuthEdgeLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: donandmartina-auth-edge-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  AuthEdgeLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: donandmartina-auth-edge
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt AuthEdgeLambdaRole.Arn
+      Timeout: 5
+      MemorySize: 128
+      Code:
+        S3Bucket: !Ref AuthEdgeLambdaS3Bucket
+        S3Key: !Ref AuthEdgeLambdaS3Key
+        S3ObjectVersion: !Ref AuthEdgeLambdaS3ObjectVersion
+
+  # Lambda@Edge associations require a published version, not $LATEST.
+  AuthEdgeLambdaVersion:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref AuthEdgeLambda
 
   # ── CloudFront distribution ─────────────────────────────────────────────────
   CloudFrontDistribution:
@@ -139,11 +198,9 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
           # AWS managed "CachingOptimized" cache policy.
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
-          # NOTE: the auth slice adds LambdaFunctionAssociations here, e.g.
-          #   LambdaFunctionAssociations:
-          #     - EventType: viewer-request
-          #       LambdaFunctionARN: !Ref AuthEdgeLambdaVersion
-          # That same viewer-request handler will also own the www→apex redirect.
+          LambdaFunctionAssociations:
+            - EventType: viewer-request
+              LambdaFunctionARN: !Ref AuthEdgeLambdaVersion
 
   # ── Apex bucket policy (bucket itself is pre-existing, not managed here) ─────
   SiteBucketPolicy:
@@ -189,3 +246,6 @@ Outputs:
   HostedZoneId:
     Description: Hosted zone id records were written to (pre-existing).
     Value: !Ref HostedZoneId
+  AuthEdgeLambdaArn:
+    Description: Auth Lambda@Edge function ARN (unversioned).
+    Value: !GetAtt AuthEdgeLambda.Arn

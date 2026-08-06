@@ -8,11 +8,85 @@ on:
 permissions:
   contents: read
 
+env:
+  ARTIFACTS_BUCKET: donandmartina-lambda-artifacts-015311074066
+
 jobs:
-  # Deploy the CloudFront + ACM + DNS stack (us-east-1, where ACM for
-  # CloudFront and the later Lambda@Edge must live). Idempotent — a no-op
-  # when the template has not changed.
+  # Deploy the Cognito user pool (Google IdP + pre-signup allow-list Lambda).
+  # Runs BEFORE the site stack because the auth-edge Lambda's config.js is
+  # built from this stack's outputs (user pool id, app client id/secret,
+  # hosted UI domain) — deploying them as one stack would be circular.
+  cognito:
+    runs-on: ubuntu-latest
+    outputs:
+      user_pool_id: ${{ steps.outputs.outputs.user_pool_id }}
+      app_client_id: ${{ steps.outputs.outputs.app_client_id }}
+      app_client_secret: ${{ steps.outputs.outputs.app_client_secret }}
+      cognito_domain: ${{ steps.outputs.outputs.cognito_domain }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Generate pre-signup Lambda config
+        run: |
+          cat > infra/lambda/pre-signup/config.js <<EOF
+          'use strict';
+          module.exports = {
+            allowedEmails: $(node -e "console.log(JSON.stringify('${{ secrets.ALLOWED_EMAILS }}'.split(',').map(s => s.trim()).filter(Boolean)))"),
+          };
+          EOF
+
+      - name: Bundle pre-signup Lambda
+        working-directory: infra/lambda/pre-signup
+        run: |
+          npm ci --omit=dev
+          zip -r ../../../pre-signup.zip . -x '*.test.js' 'tests/*' 'config.example.js'
+
+      - name: Upload pre-signup zip
+        id: upload_presignup
+        run: |
+          aws s3 cp pre-signup.zip "s3://${ARTIFACTS_BUCKET}/pre-signup.zip" --region eu-west-1
+          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key pre-signup.zip --region eu-west-1 --query VersionId --output text)
+          echo "version_id=$VERSION_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Cognito stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/cognito.yaml \
+            --stack-name donandmartina-cognito \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --region us-east-1 \
+            --parameter-overrides \
+              GoogleClientId="${{ secrets.GOOGLE_CLIENT_ID }}" \
+              GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              CognitoDomainPrefix="${{ secrets.COGNITO_DOMAIN_PREFIX }}" \
+              PreSignupLambdaS3Bucket="${ARTIFACTS_BUCKET}" \
+              PreSignupLambdaS3ObjectVersion="${{ steps.upload_presignup.outputs.version_id }}"
+
+      - name: Read Cognito stack outputs
+        id: outputs
+        run: |
+          OUT=$(aws cloudformation describe-stacks --stack-name donandmartina-cognito --region us-east-1 --query "Stacks[0].Outputs")
+          {
+            echo "user_pool_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolId") | .OutputValue')"
+            echo "app_client_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolClientId") | .OutputValue')"
+            echo "app_client_secret<<EOF_SECRET"
+            echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolClientSecret") | .OutputValue'
+            echo "EOF_SECRET"
+            echo "cognito_domain=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')"
+          } >> "$GITHUB_OUTPUT"
+
+  # Deploy the CloudFront + ACM + DNS + auth-edge Lambda@Edge stack.
   infra:
+    needs: cognito
     runs-on: ubuntu-latest
     outputs:
       distribution_id: ${{ steps.outputs.outputs.distribution_id }}
@@ -27,6 +101,38 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
+      - name: Generate auth-edge Lambda config
+        env:
+          USER_POOL_ID: ${{ needs.cognito.outputs.user_pool_id }}
+          APP_CLIENT_ID: ${{ needs.cognito.outputs.app_client_id }}
+          APP_CLIENT_SECRET: ${{ needs.cognito.outputs.app_client_secret }}
+          COGNITO_DOMAIN: ${{ needs.cognito.outputs.cognito_domain }}
+        run: |
+          cat > infra/lambda/auth/config.js <<EOF
+          'use strict';
+          module.exports = {
+            cognitoRegion: 'us-east-1',
+            userPoolId: '${USER_POOL_ID}',
+            appClientId: '${APP_CLIENT_ID}',
+            appClientSecret: '${APP_CLIENT_SECRET}',
+            cognitoDomain: '${COGNITO_DOMAIN}',
+            callbackUrl: 'https://donandmartina.com/callback',
+          };
+          EOF
+
+      - name: Bundle auth-edge Lambda
+        working-directory: infra/lambda/auth
+        run: |
+          npm ci --omit=dev
+          zip -r ../../../auth-edge.zip . -x '*.test.js' 'tests/*' 'config.example.js'
+
+      - name: Upload auth-edge zip
+        id: upload_auth
+        run: |
+          aws s3 cp auth-edge.zip "s3://${ARTIFACTS_BUCKET}/auth-edge.zip" --region eu-west-1
+          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key auth-edge.zip --region eu-west-1 --query VersionId --output text)
+          echo "version_id=$VERSION_ID" >> "$GITHUB_OUTPUT"
+
       - name: Deploy site stack
         run: |
           aws cloudformation deploy \
@@ -34,7 +140,10 @@ jobs:
             --stack-name donandmartina-site \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
-            --region us-east-1
+            --region us-east-1 \
+            --parameter-overrides \
+              AuthEdgeLambdaS3Bucket="${ARTIFACTS_BUCKET}" \
+              AuthEdgeLambdaS3ObjectVersion="${{ steps.upload_auth.outputs.version_id }}"
 
       - name: Read stack outputs
         id: outputs

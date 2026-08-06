@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  donandmartina.com Cognito user pool — Google as the sole federated IdP,
+  gated by an email allow-list pre-signup Lambda. Deployed as a separate
+  stack from the site/CloudFront stack (infra/template.yaml) because the
+  site's Lambda@Edge auth handler needs this stack's outputs (user pool id,
+  app client id/secret, hosted UI domain) baked into its own config at
+  build time — deploying them as one stack would be circular.
+
+Parameters:
+
+  GoogleClientId:
+    Type: String
+    NoEcho: true
+
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+
+  CognitoDomainPrefix:
+    Type: String
+    Default: auth-donandmartina
+    Description: Prefix for the Cognito Hosted UI domain, e.g. auth-donandmartina -> auth-donandmartina.auth.us-east-1.amazoncognito.com
+
+  CallbackUrl:
+    Type: String
+    Default: https://donandmartina.com/callback
+
+  LogoutUrl:
+    Type: String
+    Default: https://donandmartina.com/
+
+  PreSignupLambdaS3Bucket:
+    Type: String
+    Description: Artifacts bucket holding the pre-signup Lambda zip.
+
+  PreSignupLambdaS3Key:
+    Type: String
+    Default: pre-signup.zip
+
+  PreSignupLambdaS3ObjectVersion:
+    Type: String
+    Description: >-
+      S3 object version id of the zip above. The artifacts bucket has
+      versioning enabled; passing the version id (rather than relying on the
+      key alone) is what makes CloudFormation detect and deploy code changes
+      on a fixed key name.
+
+Resources:
+
+  PreSignupLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: donandmartina-pre-signup-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  PreSignupLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: donandmartina-pre-signup
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt PreSignupLambdaRole.Arn
+      Timeout: 10
+      Code:
+        S3Bucket: !Ref PreSignupLambdaS3Bucket
+        S3Key: !Ref PreSignupLambdaS3Key
+        S3ObjectVersion: !Ref PreSignupLambdaS3ObjectVersion
+
+  PreSignupLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PreSignupLambda
+      Action: lambda:InvokeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: donandmartina-users
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      DeletionProtection: INACTIVE
+      LambdaConfig:
+        PreSignUp: !GetAtt PreSignupLambda.Arn
+
+  UserPoolGoogleIdP:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref UserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: openid email profile
+      AttributeMapping:
+        email: email
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Ref CognitoDomainPrefix
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: UserPoolGoogleIdP
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: donandmartina-site
+      GenerateSecret: true
+      SupportedIdentityProviders:
+        - Google
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - !Ref CallbackUrl
+      LogoutURLs:
+        - !Ref LogoutUrl
+      ExplicitAuthFlows: []
+
+Outputs:
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  UserPoolClientSecret:
+    Value: !GetAtt UserPoolClient.ClientSecret
+  CognitoDomain:
+    Value: !Sub "${CognitoDomainPrefix}.auth.${AWS::Region}.amazoncognito.com"
