@@ -163,10 +163,17 @@ Resources:
         S3ObjectVersion: !Ref AuthEdgeLambdaS3ObjectVersion
 
   # Lambda@Edge associations require a published version, not $LATEST.
+  #
+  # Description must vary with the code, or this resource looks unchanged to
+  # CloudFormation and no new version is published — the function's $LATEST
+  # updates while CloudFront stays pinned to the previously published version,
+  # so a deploy appears to succeed but the edge keeps running the old code.
+  # Referencing the S3 object version makes each new zip publish a new version.
   AuthEdgeLambdaVersion:
     Type: AWS::Lambda::Version
     Properties:
       FunctionName: !Ref AuthEdgeLambda
+      Description: !Sub "auth-edge from s3 object version ${AuthEdgeLambdaS3ObjectVersion}"
 
   # ── CloudFront distribution ─────────────────────────────────────────────────
   CloudFrontDistribution:
