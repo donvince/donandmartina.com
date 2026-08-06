@@ -19,6 +19,8 @@
 				{{ range .Site.Params.navlinks }}
 					<li><a href="{{ $url }}{{ .url }}">{{ .name }}</a></li>
 				{{ end }}
+				<li role="separator" class="divider"></li>
+				<li><a href="/logout">Sign out</a></li>
 			</ul>
 		</div>
 	</div>

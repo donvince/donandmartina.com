@@ -2,3 +2,8 @@ baseURL = "https://donandmartina.com/"
 languageCode = "en-gb"
 title = "Don and Martina"
 theme = "hugo-geo"
+
+[params]
+  [[params.navlinks]]
+    name = "Diary"
+    url  = "diary/"

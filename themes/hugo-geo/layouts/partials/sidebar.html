@@ -26,5 +26,19 @@
 				<a href="{{ $url }}{{ .url }}">{{ .name }}</a>
 			{{ end }}
 		</div>
+		<div id="user-info" style="margin-top:1.5rem;font-size:.75rem;color:#aaa;text-align:center;">
+			<div id="user-email-line" style="display:none;margin-bottom:.25rem;">
+				<span id="user-email"></span>
+			</div>
+			<a href="/logout" style="color:#aaa;">Sign out</a>
+		</div>
+		<script>
+			fetch('/whoami').then(function(r){return r.json();}).then(function(d){
+				if(d.email){
+					document.getElementById('user-email').textContent=d.email;
+					document.getElementById('user-email-line').style.display='block';
+				}
+			}).catch(function(){});
+		</script>
 	</div>
 </div>
