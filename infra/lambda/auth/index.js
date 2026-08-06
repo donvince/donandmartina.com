@@ -2,6 +2,8 @@
 
 const { handleGuard } = require('./guard');
 const { handleCallback } = require('./callback');
+const { handleLogout } = require('./logout');
+const { handleWhoami } = require('./whoami');
 
 const ASSET_EXTENSIONS = /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp)$/i;
 
@@ -34,6 +36,14 @@ exports.handler = async (event) => {
 
   if (request.uri === '/callback') {
     return handleCallback(request);
+  }
+
+  if (request.uri === '/logout') {
+    return handleLogout();
+  }
+
+  if (request.uri === '/whoami') {
+    return handleWhoami(request);
   }
 
   if (isAsset(request.uri)) {
