@@ -1,5 +1,9 @@
 # donandmartina.com
 
+## Architecture notes
+
+- [us-east-1 coupling and request flow](docs/us-east-1-coupling.md)
+
 ## Path authentication configuration
 
 The decision for whether a request path needs authentication is made in `infra/lambda/auth/index.js`, inside the Lambda@Edge viewer-request handler.
