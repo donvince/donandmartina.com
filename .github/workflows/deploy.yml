@@ -79,13 +79,10 @@ jobs:
         id: outputs
         run: |
           OUT=$(aws cloudformation describe-stacks --stack-name donandmartina-cognito --region us-east-1 --query "Stacks[0].Outputs" --output json)
-          echo "DEBUG raw outputs: $OUT"
-          DOMAIN=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')
-          echo "DEBUG extracted domain: [$DOMAIN]"
           {
             echo "user_pool_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolId") | .OutputValue')"
             echo "app_client_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolClientId") | .OutputValue')"
-            echo "cognito_domain=$DOMAIN"
+            echo "cognito_domain=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')"
           } >> "$GITHUB_OUTPUT"
           {
             echo "app_client_secret<<EOF_SECRET"
@@ -115,7 +112,12 @@ jobs:
           USER_POOL_ID: ${{ needs.cognito.outputs.user_pool_id }}
           APP_CLIENT_ID: ${{ needs.cognito.outputs.app_client_id }}
           APP_CLIENT_SECRET: ${{ needs.cognito.outputs.app_client_secret }}
-          COGNITO_DOMAIN: ${{ needs.cognito.outputs.cognito_domain }}
+          # Built directly from the secret rather than passed through
+          # needs.cognito.outputs: a value that is itself a substring of a
+          # secret (COGNITO_DOMAIN_PREFIX) is unreliable crossing a job
+          # boundary — GitHub's secret masking silently emptied it there,
+          # even though the cognito job's own step extracted it correctly.
+          COGNITO_DOMAIN: ${{ secrets.COGNITO_DOMAIN_PREFIX }}.auth.us-east-1.amazoncognito.com
         run: |
           cat > infra/lambda/auth/config.js <<EOF
           'use strict';
