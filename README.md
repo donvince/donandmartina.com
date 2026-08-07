@@ -6,6 +6,8 @@ The decision for whether a request path needs authentication is made in `infra/l
 
 That handler explicitly bypasses authentication for:
 
+- `/` and `/index.html`, so the homepage is public
+- `/login`, which redirects to the Cognito Hosted UI and returns to `/diary/` after sign-in
 - `/callback`
 - `/logout`
 - `/whoami`

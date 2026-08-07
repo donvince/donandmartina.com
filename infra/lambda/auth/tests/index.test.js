@@ -6,8 +6,15 @@ jest.mock('../guard', () => ({
 jest.mock('../callback', () => ({
   handleCallback: jest.fn().mockResolvedValue({ status: '302' }),
 }));
+jest.mock('../config', () => ({
+  cognitoRegion: 'us-east-1',
+  userPoolId: 'us-east-1_TEST',
+  appClientId: 'test-client',
+  cognitoDomain: 'auth.poc.example.com',
+  callbackUrl: 'https://poc.example.com/callback',
+}), { virtual: true });
 
-const { handler, _rewriteToIndex, _isAsset } = require('../index');
+const { handler, _rewriteToIndex, _isAsset, _isPublicHomepage } = require('../index');
 const { handleGuard } = require('../guard');
 const { handleCallback } = require('../callback');
 
@@ -59,9 +66,32 @@ describe('handler routing', () => {
     expect(handleGuard).not.toHaveBeenCalled();
   });
 
+  it('redirects /login to the Cognito login page', async () => {
+    const result = await handler(makeEvent('/login'));
+    expect(result.status).toBe('302');
+    expect(result.headers.location[0].value).toContain('https://auth.poc.example.com/login');
+    expect(handleGuard).not.toHaveBeenCalled();
+
+    const params = new URL(result.headers.location[0].value).searchParams;
+    const state = JSON.parse(Buffer.from(params.get('state'), 'base64url').toString());
+    expect(state.returnTo).toBe('/diary/');
+  });
+
+  it('serves the homepage without calling guard', async () => {
+    const result = await handler(makeEvent('/'));
+    expect(result.uri).toBe('/index.html');
+    expect(handleGuard).not.toHaveBeenCalled();
+  });
+
+  it('serves /index.html without calling guard', async () => {
+    const result = await handler(makeEvent('/index.html'));
+    expect(result.uri).toBe('/index.html');
+    expect(handleGuard).not.toHaveBeenCalled();
+  });
+
   it('routes everything else to handleGuard', async () => {
     authenticate();
-    await handler(makeEvent('/index.html'));
+    await handler(makeEvent('/diary/'));
     expect(handleGuard).toHaveBeenCalled();
   });
 });
@@ -124,5 +154,16 @@ describe('_isAsset', () => {
   it('does not treat a directory path as an asset', () => {
     expect(_isAsset('/diary/')).toBe(false);
     expect(_isAsset('/diary/foo')).toBe(false);
+  });
+});
+
+describe('_isPublicHomepage', () => {
+  it('treats the root and explicit index as public homepage requests', () => {
+    expect(_isPublicHomepage('/')).toBe(true);
+    expect(_isPublicHomepage('/index.html')).toBe(true);
+  });
+
+  it('does not treat other paths as the public homepage', () => {
+    expect(_isPublicHomepage('/diary/')).toBe(false);
   });
 });

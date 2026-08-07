@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Don and Martina">
+  <title>{{ .Site.Title }}</title>
+  {{ hugo.Generator }}
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #2a241d;
+      --paper: #fff8e8;
+      --accent: #d95763;
+      --accent-dark: #ad2f43;
+      --tile: #ffffff;
+      --tile-border: #ead8bd;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      align-items: center;
+      background:
+        radial-gradient(circle at top left, rgba(217, 87, 99, 0.18), transparent 32rem),
+        radial-gradient(circle at bottom right, rgba(89, 165, 209, 0.16), transparent 28rem),
+        var(--paper);
+      color: var(--ink);
+      display: flex;
+      font-family: Georgia, "Times New Roman", serif;
+      justify-content: center;
+      margin: 0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    main {
+      max-width: 30rem;
+      text-align: center;
+      width: 100%;
+    }
+
+    .letter-grid {
+      display: grid;
+      gap: 0.65rem;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin: 0 auto 2rem;
+    }
+
+    .letter-grid span {
+      align-items: center;
+      aspect-ratio: 1;
+      background: var(--tile);
+      border: 2px solid var(--tile-border);
+      border-radius: 1rem;
+      box-shadow: 0 0.55rem 1.4rem rgba(42, 36, 29, 0.08);
+      display: flex;
+      font-size: clamp(2rem, 12vw, 4.5rem);
+      font-weight: 700;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .letter-grid .heart {
+      color: var(--accent);
+      font-size: clamp(1.6rem, 9vw, 3.5rem);
+    }
+
+    .login-card,
+    .member-card {
+      background: rgba(255, 255, 255, 0.76);
+      border: 2px solid var(--tile-border);
+      border-radius: 1.5rem;
+      box-shadow: 0 1rem 2.5rem rgba(42, 36, 29, 0.1);
+      padding: 1.35rem;
+    }
+
+    .login-card {
+      color: inherit;
+      display: block;
+      text-decoration: none;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .login-card:hover,
+    .login-card:focus {
+      box-shadow: 0 1.2rem 3rem rgba(42, 36, 29, 0.16);
+      transform: translateY(-2px);
+    }
+
+    .login-card strong,
+    .member-card strong {
+      display: block;
+      font-size: 1.45rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .login-card span,
+    .member-card span {
+      color: var(--accent-dark);
+      font-size: 1rem;
+    }
+
+    .member-card {
+      display: none;
+    }
+
+    .is-authenticated .login-card {
+      display: none;
+    }
+
+    .is-authenticated .member-card {
+      display: block;
+    }
+
+    .diary-link {
+      color: var(--accent-dark);
+      display: inline-block;
+      font-weight: 700;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="letter-grid" aria-label="Don and Martina">
+      <span>D</span>
+      <span>O</span>
+      <span>N</span>
+      <span aria-hidden="true">&nbsp;</span>
+      <span>A</span>
+      <span>N</span>
+      <span>D</span>
+      <span aria-hidden="true">&nbsp;</span>
+      <span>M</span>
+      <span>A</span>
+      <span>R</span>
+      <span>T</span>
+      <span>I</span>
+      <span>N</span>
+      <span>A</span>
+      <span class="heart" aria-label="heart">❤️</span>
+    </div>
+
+    <a class="login-card" href="/login">
+      <strong>Sign in</strong>
+      <span>Open the family diary</span>
+    </a>
+
+    <section class="member-card" aria-live="polite">
+      <strong>You're signed in</strong>
+      <span id="member-email"></span>
+      <a class="diary-link" href="/diary/">Read the diary</a>
+    </section>
+  </main>
+
+  <script>
+    fetch('/whoami', { credentials: 'same-origin', cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((user) => {
+        if (!user || !user.email) return;
+        document.body.classList.add('is-authenticated');
+        document.getElementById('member-email').textContent = user.email;
+      })
+      .catch((error) => {
+        console.warn('Could not check sign-in status', error);
+      });
+  </script>
+</body>
+</html>

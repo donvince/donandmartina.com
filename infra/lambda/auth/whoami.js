@@ -1,14 +1,16 @@
 'use strict';
 
 const { parseCookies } = require('./cookies');
+const { verifyToken } = require('./jwt');
+const config = require('./config');
 
-function handleWhoami(request) {
+async function handleWhoami(request) {
   const cookieHeader = request.headers.cookie?.[0]?.value || '';
   const token = parseCookies(cookieHeader).id_token;
   let email = null;
   if (token) {
     try {
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+      const payload = await verifyToken(token, config);
       email = payload.email || null;
     } catch (_) {}
   }

@@ -4,11 +4,17 @@ const { handleGuard } = require('./guard');
 const { handleCallback } = require('./callback');
 const { handleLogout } = require('./logout');
 const { handleWhoami } = require('./whoami');
+const { buildLoginUrl } = require('./urls');
+const config = require('./config');
 
 const ASSET_EXTENSIONS = /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp)$/i;
 
 function isAsset(uri) {
   return uri.startsWith('/assets/') || ASSET_EXTENSIONS.test(uri);
+}
+
+function isPublicHomepage(uri) {
+  return uri === '/' || uri === '/index.html';
 }
 
 // The site is served from a private S3 bucket via CloudFront Origin Access
@@ -42,8 +48,24 @@ exports.handler = async (event) => {
     return handleLogout();
   }
 
+  if (request.uri === '/login') {
+    return {
+      status: '302',
+      statusDescription: 'Found',
+      headers: {
+        location: [{ key: 'Location', value: buildLoginUrl(config, '/diary/') }],
+        'cache-control': [{ key: 'Cache-Control', value: 'no-store' }],
+      },
+    };
+  }
+
   if (request.uri === '/whoami') {
     return handleWhoami(request);
+  }
+
+  if (isPublicHomepage(request.uri)) {
+    request.uri = rewriteToIndex(request.uri);
+    return request;
   }
 
   if (isAsset(request.uri)) {
@@ -65,3 +87,4 @@ exports.handler = async (event) => {
 
 exports._rewriteToIndex = rewriteToIndex;
 exports._isAsset = isAsset;
+exports._isPublicHomepage = isPublicHomepage;
