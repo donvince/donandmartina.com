@@ -82,10 +82,12 @@ jobs:
           {
             echo "user_pool_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolId") | .OutputValue')"
             echo "app_client_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolClientId") | .OutputValue')"
+            echo "cognito_domain=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')"
+          } >> "$GITHUB_OUTPUT"
+          {
             echo "app_client_secret<<EOF_SECRET"
             echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolClientSecret") | .OutputValue'
             echo "EOF_SECRET"
-            echo "cognito_domain=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')"
           } >> "$GITHUB_OUTPUT"
 
   # Deploy the CloudFront + ACM + DNS + auth-edge Lambda@Edge stack.
