@@ -78,11 +78,14 @@ jobs:
       - name: Read Cognito stack outputs
         id: outputs
         run: |
-          OUT=$(aws cloudformation describe-stacks --stack-name donandmartina-cognito --region us-east-1 --query "Stacks[0].Outputs")
+          OUT=$(aws cloudformation describe-stacks --stack-name donandmartina-cognito --region us-east-1 --query "Stacks[0].Outputs" --output json)
+          echo "DEBUG raw outputs: $OUT"
+          DOMAIN=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')
+          echo "DEBUG extracted domain: [$DOMAIN]"
           {
             echo "user_pool_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolId") | .OutputValue')"
             echo "app_client_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolClientId") | .OutputValue')"
-            echo "cognito_domain=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')"
+            echo "cognito_domain=$DOMAIN"
           } >> "$GITHUB_OUTPUT"
           {
             echo "app_client_secret<<EOF_SECRET"
