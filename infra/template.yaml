@@ -152,7 +152,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: donandmartina-auth-edge
-      Runtime: nodejs20.x
+      Runtime: nodejs24.x
       Handler: index.handler
       Role: !GetAtt AuthEdgeLambdaRole.Arn
       Timeout: 5
