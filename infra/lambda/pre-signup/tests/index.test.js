@@ -1,9 +1,9 @@
-// Mock config before requiring handler
-// config.js is generated at CI time and gitignored; mock it virtually so
-// tests run offline without a real config module present.
-jest.mock('../config', () => ({
-  allowedEmails: ['allowed@gmail.com'],
-}), { virtual: true });
+const mockSend = jest.fn();
+
+jest.mock('@aws-sdk/client-ssm', () => ({
+  SSMClient: jest.fn(() => ({ send: mockSend })),
+  GetParameterCommand: jest.fn(input => input),
+}));
 
 const { handler } = require('../index');
 
@@ -15,21 +15,60 @@ function makeEvent(email, triggerSource = 'PreSignUp_ExternalProvider') {
   };
 }
 
-describe('pre-signup handler', () => {
-  it('allows a permitted email and auto-confirms', async () => {
-    const event = makeEvent('allowed@gmail.com');
-    const result = await handler(event);
-    expect(result.response.autoConfirmUser).toBe(true);
-    expect(result.response.autoVerifyEmail).toBe(true);
+describe('Cognito allow-list handler', () => {
+  beforeEach(() => {
+    mockSend.mockReset();
+    mockSend.mockResolvedValue({ Parameter: { Value: 'allowed@gmail.com, OTHER@gmail.com' } });
   });
 
-  it('throws for an email not on the list', async () => {
-    const event = makeEvent('stranger@gmail.com');
-    await expect(handler(event)).rejects.toThrow('not permitted');
+  it('allows a permitted pre-signup email and auto-confirms and verifies it', async () => {
+    const event = makeEvent('ALLOWED@gmail.com');
+
+    await expect(handler(event)).resolves.toBe(event);
+
+    expect(event.response).toEqual({ autoConfirmUser: true, autoVerifyEmail: true });
+    expect(mockSend).toHaveBeenCalledWith({ Name: '/donandmartina/auth/allowed-emails' });
+  });
+
+  it('allows a permitted pre-authentication email without changing the event', async () => {
+    const event = makeEvent('other@gmail.com', 'PreAuthentication_Authentication');
+    const original = structuredClone(event);
+
+    await expect(handler(event)).resolves.toBe(event);
+
+    expect(event).toEqual(original);
+  });
+
+  it.each([
+    'PreSignUp_ExternalProvider',
+    'PreAuthentication_Authentication',
+  ])('rejects an email not on the list for %s', async triggerSource => {
+    await expect(handler(makeEvent('stranger@gmail.com', triggerSource)))
+      .rejects.toThrow('not permitted');
   });
 
   it('rejects missing email attribute', async () => {
     const event = makeEvent(undefined);
-    await expect(handler(event)).rejects.toThrow();
+    await expect(handler(event)).rejects.toThrow('not permitted');
+  });
+
+  it.each([
+    [{ Parameter: { Value: '' } }, 'empty'],
+    [{ Parameter: {} }, 'empty'],
+    [{}, 'empty'],
+  ])('fails closed for an invalid SSM response', async (response, message) => {
+    mockSend.mockResolvedValue(response);
+    await expect(handler(makeEvent('allowed@gmail.com'))).rejects.toThrow(message);
+  });
+
+  it('fails closed when SSM retrieval fails', async () => {
+    mockSend.mockRejectedValue(new Error('SSM unavailable'));
+    await expect(handler(makeEvent('allowed@gmail.com'))).rejects.toThrow('SSM unavailable');
+  });
+
+  it('retrieves the parameter on every invocation', async () => {
+    await handler(makeEvent('allowed@gmail.com'));
+    await handler(makeEvent('allowed@gmail.com', 'PreAuthentication_Authentication'));
+    expect(mockSend).toHaveBeenCalledTimes(2);
   });
 });

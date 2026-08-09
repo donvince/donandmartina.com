@@ -1,15 +1,27 @@
 'use strict';
 
-const { isAllowed } = require('./allowlist');
-const { allowedEmails } = require('./config');
+const { GetParameterCommand, SSMClient } = require('@aws-sdk/client-ssm');
+const { isAllowed, parseAllowedEmails } = require('./allowlist');
+
+const ALLOWED_EMAILS_PARAMETER = '/donandmartina/auth/allowed-emails';
+const ssm = new SSMClient();
 
 async function handler(event) {
-  const email = event.request.userAttributes.email;
+  const result = await ssm.send(new GetParameterCommand({
+    Name: ALLOWED_EMAILS_PARAMETER,
+  }));
+  const allowedEmails = parseAllowedEmails(result.Parameter?.Value);
+  const email = event.request?.userAttributes?.email;
+
   if (!isAllowed(email, allowedEmails)) {
     throw new Error(`Email not permitted: ${email}`);
   }
-  event.response.autoConfirmUser = true;
-  event.response.autoVerifyEmail = true;
+
+  if (event.triggerSource?.startsWith('PreSignUp_')) {
+    event.response.autoConfirmUser = true;
+    event.response.autoVerifyEmail = true;
+  }
+
   return event;
 }
 

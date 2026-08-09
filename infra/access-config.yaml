@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: donandmartina.com authentication access configuration.
+
+Parameters:
+  AllowedEmails:
+    Type: String
+    NoEcho: true
+    MinLength: 1
+    Description: Normalized comma-separated email addresses allowed to authenticate.
+
+Resources:
+  AllowedEmailsParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /donandmartina/auth/allowed-emails
+      Description: Email addresses allowed to authenticate to donandmartina.com.
+      Type: StringList
+      Tier: Standard
+      Value: !Ref AllowedEmails
+
+Outputs:
+  AllowedEmailsParameterName:
+    Value: !Ref AllowedEmailsParameter

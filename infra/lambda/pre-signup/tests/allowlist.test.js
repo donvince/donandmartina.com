@@ -1,4 +1,4 @@
-const { isAllowed } = require('../allowlist');
+const { isAllowed, parseAllowedEmails } = require('../allowlist');
 
 const EMAILS = ['alice@gmail.com', 'Bob@gmail.com'];
 
@@ -26,5 +26,16 @@ describe('isAllowed', () => {
 
   it('rejects null', () => {
     expect(isAllowed(null, EMAILS)).toBe(false);
+  });
+});
+
+describe('parseAllowedEmails', () => {
+  it('splits, trims, lowercases, and deduplicates a StringList value', () => {
+    expect(parseAllowedEmails(' Alice@gmail.com, bob@gmail.com,ALICE@GMAIL.COM '))
+      .toEqual(['alice@gmail.com', 'bob@gmail.com']);
+  });
+
+  it.each([undefined, null, '', ' , '])('rejects an empty parameter value (%p)', value => {
+    expect(() => parseAllowedEmails(value)).toThrow('empty');
   });
 });

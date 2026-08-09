@@ -16,6 +16,39 @@ env:
   ARTIFACTS_BUCKET: donandmartina-lambda-artifacts-us-east-1-015311074066
 
 jobs:
+  # Create the allow-list parameter before publishing a Lambda that reads it.
+  # Later list-only changes should use update-allowed-emails.yml instead.
+  access-config:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Normalize and validate allowed emails
+        env:
+          ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
+        run: |
+          node --test infra/scripts/normalize-allowed-emails.test.js
+          NORMALIZED=$(node infra/scripts/normalize-allowed-emails.js)
+          echo "::add-mask::$NORMALIZED"
+          echo "ALLOWED_EMAILS_NORMALIZED=$NORMALIZED" >> "$GITHUB_ENV"
+
+      - name: Deploy access configuration stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/access-config.yaml \
+            --stack-name donandmartina-access-config \
+            --no-fail-on-empty-changeset \
+            --region us-east-1 \
+            --parameter-overrides AllowedEmails="$ALLOWED_EMAILS_NORMALIZED"
+
   # Deploy the Lambda artifacts bucket. Runs independently; subsequent jobs
   # assume the bucket exists before uploading zips.
   artifacts:
@@ -44,7 +77,7 @@ jobs:
   # built from this stack's outputs (user pool id, app client id/secret,
   # hosted UI domain) — deploying them as one stack would be circular.
   cognito:
-    needs: artifacts
+    needs: [access-config, artifacts]
     runs-on: ubuntu-latest
     outputs:
       user_pool_id: ${{ steps.outputs.outputs.user_pool_id }}
@@ -60,15 +93,6 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
-
-      - name: Generate pre-signup Lambda config
-        run: |
-          cat > infra/lambda/pre-signup/config.js <<EOF
-          'use strict';
-          module.exports = {
-            allowedEmails: $(node -e "console.log(JSON.stringify('${{ secrets.ALLOWED_EMAILS }}'.split(',').map(s => s.trim()).filter(Boolean)))"),
-          };
-          EOF
 
       - name: Bundle pre-signup Lambda
         working-directory: infra/lambda/pre-signup

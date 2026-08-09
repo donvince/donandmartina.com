@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   donandmartina.com Cognito user pool — Google as the sole federated IdP,
-  gated by an email allow-list pre-signup Lambda. Deployed as a separate
+  gated by an email allow-list Cognito trigger Lambda. Deployed as a separate
   stack from the site/CloudFront stack (infra/template.yaml) because the
   site's Lambda@Edge auth handler needs this stack's outputs (user pool id,
   app client id/secret, hosted UI domain) baked into its own config at
@@ -61,6 +61,14 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ReadAllowedEmailsParameter
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/donandmartina/auth/allowed-emails
 
   PreSignupLambda:
     Type: AWS::Lambda::Function
@@ -94,6 +102,7 @@ Resources:
       DeletionProtection: INACTIVE
       LambdaConfig:
         PreSignUp: !GetAtt PreSignupLambda.Arn
+        PreAuthentication: !GetAtt PreSignupLambda.Arn
 
   UserPoolGoogleIdP:
     Type: AWS::Cognito::UserPoolIdentityProvider

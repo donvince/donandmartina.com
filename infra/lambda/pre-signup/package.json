@@ -8,5 +8,8 @@
   },
   "devDependencies": {
     "jest": "^29.7.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ssm": "^3.1106.0"
   }
 }
