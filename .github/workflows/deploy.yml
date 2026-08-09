@@ -8,6 +8,14 @@ on:
 permissions:
   contents: read
 
+# CloudFormation can keep updating the site stack after a runner has stopped,
+# especially while old Lambda@Edge replicas drain. Queue full deployments so
+# a newer push cannot race the active stack update. Do not cancel the active
+# run: cancelling GitHub Actions does not cancel CloudFormation.
+concurrency:
+  group: donandmartina-site-deploy
+  cancel-in-progress: false
+
 env:
   # Must be in us-east-1: Lambda fetches the zip using the function's own
   # region, and both Lambdas here (Cognito allow-list, Lambda@Edge auth) are
@@ -128,6 +136,48 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+
+      - name: Wait for site stack to become updateable
+        run: |
+          for attempt in $(seq 1 80); do
+            set +e
+            STACK_OUTPUT=$(aws cloudformation describe-stacks \
+              --stack-name donandmartina-site \
+              --region us-east-1 \
+              --query 'Stacks[0].StackStatus' \
+              --output text 2>&1)
+            DESCRIBE_EXIT=$?
+            set -e
+
+            if [ "$DESCRIBE_EXIT" -ne 0 ]; then
+              if echo "$STACK_OUTPUT" | grep -q 'does not exist'; then
+                echo "Site stack does not exist yet; CloudFormation can create it."
+                break
+              fi
+
+              echo "$STACK_OUTPUT" >&2
+              exit "$DESCRIBE_EXIT"
+            fi
+
+            case "$STACK_OUTPUT" in
+              CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE|IMPORT_COMPLETE|IMPORT_ROLLBACK_COMPLETE)
+                echo "Site stack is updateable: $STACK_OUTPUT"
+                break
+                ;;
+              *_IN_PROGRESS)
+                if [ "$attempt" -eq 80 ]; then
+                  echo "Timed out after 20 minutes waiting for site stack; current status: $STACK_OUTPUT" >&2
+                  exit 1
+                fi
+                echo "Site stack is $STACK_OUTPUT; waiting 15 seconds ($attempt/80)."
+                sleep 15
+                ;;
+              *)
+                echo "Site stack is not updateable: $STACK_OUTPUT" >&2
+                exit 1
+                ;;
+            esac
+          done
 
       - name: Generate auth-edge Lambda config
         env:
