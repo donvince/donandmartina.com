@@ -1,4 +1,5 @@
 const mockSend = jest.fn();
+process.env.ALLOWED_EMAILS_PARAMETER_NAME = '/test/auth/allowed-emails';
 
 jest.mock('@aws-sdk/client-ssm', () => ({
   SSMClient: jest.fn(() => ({ send: mockSend })),
@@ -27,7 +28,7 @@ describe('Cognito allow-list handler', () => {
     await expect(handler(event)).resolves.toBe(event);
 
     expect(event.response).toEqual({ autoConfirmUser: true, autoVerifyEmail: true });
-    expect(mockSend).toHaveBeenCalledWith({ Name: '/donandmartina/auth/allowed-emails' });
+    expect(mockSend).toHaveBeenCalledWith({ Name: '/test/auth/allowed-emails' });
   });
 
   it('allows a permitted pre-authentication email without changing the event', async () => {
@@ -64,6 +65,16 @@ describe('Cognito allow-list handler', () => {
   it('fails closed when SSM retrieval fails', async () => {
     mockSend.mockRejectedValue(new Error('SSM unavailable'));
     await expect(handler(makeEvent('allowed@gmail.com'))).rejects.toThrow('SSM unavailable');
+  });
+
+  it('fails closed when the parameter name is not configured', async () => {
+    const parameterName = process.env.ALLOWED_EMAILS_PARAMETER_NAME;
+    delete process.env.ALLOWED_EMAILS_PARAMETER_NAME;
+
+    await expect(handler(makeEvent('allowed@gmail.com'))).rejects.toThrow('not configured');
+    expect(mockSend).not.toHaveBeenCalled();
+
+    process.env.ALLOWED_EMAILS_PARAMETER_NAME = parameterName;
   });
 
   it('retrieves the parameter on every invocation', async () => {

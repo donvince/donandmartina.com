@@ -30,15 +30,15 @@ Parameters:
     Type: String
     Default: https://donandmartina.com/
 
-  PreSignupLambdaS3Bucket:
+  CognitoAllowListLambdaS3Bucket:
     Type: String
-    Description: Artifacts bucket holding the pre-signup Lambda zip.
+    Description: Artifacts bucket holding the Cognito allow-list Lambda zip.
 
-  PreSignupLambdaS3Key:
+  CognitoAllowListLambdaS3Key:
     Type: String
-    Default: pre-signup.zip
+    Default: cognito-allow-list.zip
 
-  PreSignupLambdaS3ObjectVersion:
+  CognitoAllowListLambdaS3ObjectVersion:
     Type: String
     Description: >-
       S3 object version id of the zip above. The artifacts bucket has
@@ -48,10 +48,10 @@ Parameters:
 
 Resources:
 
-  PreSignupLambdaRole:
+  CognitoAllowListLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: donandmartina-pre-signup-role
+      RoleName: donandmartina-cognito-allow-list-role
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -68,25 +68,30 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: ssm:GetParameter
-                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/donandmartina/auth/allowed-emails
+                Resource:
+                  Fn::ImportValue: donandmartina-access-config-AllowedEmailsParameterArn
 
-  PreSignupLambda:
+  CognitoAllowListLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: donandmartina-pre-signup
+      FunctionName: donandmartina-cognito-allow-list
       Runtime: nodejs24.x
       Handler: index.handler
-      Role: !GetAtt PreSignupLambdaRole.Arn
+      Role: !GetAtt CognitoAllowListLambdaRole.Arn
       Timeout: 10
+      Environment:
+        Variables:
+          ALLOWED_EMAILS_PARAMETER_NAME:
+            Fn::ImportValue: donandmartina-access-config-AllowedEmailsParameterName
       Code:
-        S3Bucket: !Ref PreSignupLambdaS3Bucket
-        S3Key: !Ref PreSignupLambdaS3Key
-        S3ObjectVersion: !Ref PreSignupLambdaS3ObjectVersion
+        S3Bucket: !Ref CognitoAllowListLambdaS3Bucket
+        S3Key: !Ref CognitoAllowListLambdaS3Key
+        S3ObjectVersion: !Ref CognitoAllowListLambdaS3ObjectVersion
 
-  PreSignupLambdaPermission:
+  CognitoAllowListLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !Ref PreSignupLambda
+      FunctionName: !Ref CognitoAllowListLambda
       Action: lambda:InvokeFunction
       Principal: cognito-idp.amazonaws.com
       SourceArn: !GetAtt UserPool.Arn
@@ -101,8 +106,8 @@ Resources:
         - email
       DeletionProtection: INACTIVE
       LambdaConfig:
-        PreSignUp: !GetAtt PreSignupLambda.Arn
-        PreAuthentication: !GetAtt PreSignupLambda.Arn
+        PreSignUp: !GetAtt CognitoAllowListLambda.Arn
+        PreAuthentication: !GetAtt CognitoAllowListLambda.Arn
 
   UserPoolGoogleIdP:
     Type: AWS::Cognito::UserPoolIdentityProvider

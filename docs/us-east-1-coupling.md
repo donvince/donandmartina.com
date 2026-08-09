@@ -61,8 +61,9 @@ The steady-state page request can stay local to CloudFront edge plus cache. us-e
 flowchart TB
   subgraph USE1["us-east-1"]
     Artifacts["Versioned Lambda artifact bucket"]
+    AccessConfig["SSM authentication allow list"]
     Cognito["Cognito user pool\nHosted UI + Google IdP"]
-    PreSignup["Pre-signup allow-list Lambda"]
+    CognitoAllowList["Cognito allow-list Lambda"]
     AuthSource["Auth Lambda@Edge source function"]
     AuthVersion["Published Lambda version"]
     ACM["ACM certificate for CloudFront"]
@@ -78,8 +79,9 @@ flowchart TB
     SiteBucket["Private S3 site bucket\ndonandmartina.com"]
   end
 
-  Artifacts --> PreSignup
-  PreSignup --> Cognito
+  Artifacts --> CognitoAllowList
+  AccessConfig --> CognitoAllowList
+  CognitoAllowList --> Cognito
   Cognito --> AuthSource
   Artifacts --> AuthSource
   AuthSource --> AuthVersion
@@ -100,7 +102,7 @@ The site stack is deployed in us-east-1 because CloudFront requires its ACM cert
 | Auth Lambda@Edge source function and version | us-east-1 | no, except as source for replicas | Lambda@Edge functions must be created and versioned in us-east-1. |
 | Cognito Hosted UI and user pool | us-east-1 | login/callback only | Provides Google-backed sign-in and token issuer. |
 | Cognito JWKS endpoint | us-east-1 | occasional | Edge Lambda validates JWT signatures and caches JWKS in-process. |
-| Pre-signup allow-list Lambda | us-east-1 | first sign-in/signup only | Cognito trigger gates allowed emails. |
+| Cognito allow-list Lambda | us-east-1 | signup and every authentication | Cognito triggers gate allowed emails against Parameter Store. |
 | ACM certificate | us-east-1 | TLS control plane | CloudFront viewer certificates must be in us-east-1. |
 | Lambda artifact bucket | us-east-1 | deploy only | Lambda fetches zips from its own region; cross-region artifacts cause redirects. |
 | CloudFormation stacks | us-east-1 | deploy only | Owns the CloudFront, ACM, Lambda@Edge, and Cognito resources. |

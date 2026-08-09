@@ -3,12 +3,16 @@
 const { GetParameterCommand, SSMClient } = require('@aws-sdk/client-ssm');
 const { isAllowed, parseAllowedEmails } = require('./allowlist');
 
-const ALLOWED_EMAILS_PARAMETER = '/donandmartina/auth/allowed-emails';
 const ssm = new SSMClient();
 
 async function handler(event) {
+  const parameterName = process.env.ALLOWED_EMAILS_PARAMETER_NAME?.trim();
+  if (!parameterName) {
+    throw new Error('Allowed email parameter name is not configured');
+  }
+
   const result = await ssm.send(new GetParameterCommand({
-    Name: ALLOWED_EMAILS_PARAMETER,
+    Name: parameterName,
   }));
   const allowedEmails = parseAllowedEmails(result.Parameter?.Value);
   const email = event.request?.userAttributes?.email;

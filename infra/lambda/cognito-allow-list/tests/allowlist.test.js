@@ -1,6 +1,6 @@
 const { isAllowed, parseAllowedEmails } = require('../allowlist');
 
-const EMAILS = ['alice@gmail.com', 'Bob@gmail.com'];
+const EMAILS = ['alice@gmail.com', 'bob@gmail.com'];
 
 describe('isAllowed', () => {
   it('permits an exact match', () => {
@@ -37,5 +37,15 @@ describe('parseAllowedEmails', () => {
 
   it.each([undefined, null, '', ' , '])('rejects an empty parameter value (%p)', value => {
     expect(() => parseAllowedEmails(value)).toThrow('empty');
+  });
+
+  it.each([
+    'not-an-email',
+    'a..b@example.com',
+    'a@example..com',
+    'a@example.com.',
+    'a@-example.com',
+  ])('rejects malformed address %s', value => {
+    expect(() => parseAllowedEmails(value)).toThrow('malformed');
   });
 });

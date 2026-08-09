@@ -21,3 +21,9 @@ Resources:
 Outputs:
   AllowedEmailsParameterName:
     Value: !Ref AllowedEmailsParameter
+    Export:
+      Name: donandmartina-access-config-AllowedEmailsParameterName
+  AllowedEmailsParameterArn:
+    Value: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${AllowedEmailsParameter}
+    Export:
+      Name: donandmartina-access-config-AllowedEmailsParameterArn

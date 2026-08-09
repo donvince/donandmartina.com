@@ -12,7 +12,7 @@ test('normalizes and deduplicates the configured addresses', () => {
 });
 
 test('rejects an empty list', () => {
-  assert.throws(() => normalizeAllowedEmails(' , '), /at least one/);
+  assert.throws(() => normalizeAllowedEmails(' , '), /empty/);
 });
 
 test('rejects malformed addresses', () => {

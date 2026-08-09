@@ -8,7 +8,7 @@ node_modules/
 infra/lambda/**/config.js
 infra/lambda/**/*.zip
 # The bundle steps zip into the repo root, not next to the sources.
-/pre-signup.zip
+/cognito-allow-list.zip
 /auth-edge.zip
 
 # Local

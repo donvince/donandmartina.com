@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   Lambda artifact storage for donandmartina.com. Must be in us-east-1:
-  Lambda@Edge and the pre-signup Lambda both run in us-east-1, and S3 source
+  Lambda@Edge and the Cognito allow-list Lambda both run in us-east-1, and S3 source
   buckets must be in the same region as the Lambda function.
 
 Resources:

@@ -10,44 +10,20 @@ permissions:
 
 env:
   # Must be in us-east-1: Lambda fetches the zip using the function's own
-  # region, and both Lambdas here (Cognito pre-signup, Lambda@Edge auth) are
+  # region, and both Lambdas here (Cognito allow-list, Lambda@Edge auth) are
   # us-east-1. A cross-region bucket fails with GetObjectVersion
   # TemporaryRedirect.
   ARTIFACTS_BUCKET: donandmartina-lambda-artifacts-us-east-1-015311074066
 
 jobs:
   # Create the allow-list parameter before publishing a Lambda that reads it.
-  # Later list-only changes should use update-allowed-emails.yml instead.
+  # The called workflow can also be dispatched directly for list-only changes.
   access-config:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Normalize and validate allowed emails
-        env:
-          ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
-        run: |
-          node --test infra/scripts/normalize-allowed-emails.test.js
-          NORMALIZED=$(node infra/scripts/normalize-allowed-emails.js)
-          echo "::add-mask::$NORMALIZED"
-          echo "ALLOWED_EMAILS_NORMALIZED=$NORMALIZED" >> "$GITHUB_ENV"
-
-      - name: Deploy access configuration stack
-        run: |
-          aws cloudformation deploy \
-            --template-file infra/access-config.yaml \
-            --stack-name donandmartina-access-config \
-            --no-fail-on-empty-changeset \
-            --region us-east-1 \
-            --parameter-overrides AllowedEmails="$ALLOWED_EMAILS_NORMALIZED"
+    uses: ./.github/workflows/update-allowed-emails.yml
+    secrets:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
 
   # Deploy the Lambda artifacts bucket. Runs independently; subsequent jobs
   # assume the bucket exists before uploading zips.
@@ -72,7 +48,7 @@ jobs:
             --no-fail-on-empty-changeset \
             --region us-east-1
 
-  # Deploy the Cognito user pool (Google IdP + pre-signup allow-list Lambda).
+  # Deploy the Cognito user pool (Google IdP + Cognito allow-list Lambda).
   # Runs BEFORE the site stack because the auth-edge Lambda's config.js is
   # built from this stack's outputs (user pool id, app client id/secret,
   # hosted UI domain) — deploying them as one stack would be circular.
@@ -94,17 +70,17 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Bundle pre-signup Lambda
-        working-directory: infra/lambda/pre-signup
+      - name: Bundle Cognito allow-list Lambda
+        working-directory: infra/lambda/cognito-allow-list
         run: |
           npm ci --omit=dev
-          zip -r ../../../pre-signup.zip . -x '*.test.js' 'tests/*' 'config.example.js'
+          zip -r ../../../cognito-allow-list.zip . -x '*.test.js' 'tests/*'
 
-      - name: Upload pre-signup zip
-        id: upload_presignup
+      - name: Upload Cognito allow-list zip
+        id: upload_cognito_allow_list
         run: |
-          aws s3 cp pre-signup.zip "s3://${ARTIFACTS_BUCKET}/pre-signup.zip" --region us-east-1
-          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key pre-signup.zip --region us-east-1 --query VersionId --output text)
+          aws s3 cp cognito-allow-list.zip "s3://${ARTIFACTS_BUCKET}/cognito-allow-list.zip" --region us-east-1
+          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key cognito-allow-list.zip --region us-east-1 --query VersionId --output text)
           echo "version_id=$VERSION_ID" >> "$GITHUB_OUTPUT"
 
       - name: Deploy Cognito stack
@@ -119,8 +95,8 @@ jobs:
               GoogleClientId="${{ secrets.GOOGLE_CLIENT_ID }}" \
               GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
               CognitoDomainPrefix="${{ secrets.COGNITO_DOMAIN_PREFIX }}" \
-              PreSignupLambdaS3Bucket="${ARTIFACTS_BUCKET}" \
-              PreSignupLambdaS3ObjectVersion="${{ steps.upload_presignup.outputs.version_id }}"
+              CognitoAllowListLambdaS3Bucket="${ARTIFACTS_BUCKET}" \
+              CognitoAllowListLambdaS3ObjectVersion="${{ steps.upload_cognito_allow_list.outputs.version_id }}"
 
       - name: Read Cognito stack outputs
         id: outputs
