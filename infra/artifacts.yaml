@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Lambda artifact storage for donandmartina.com. Must be in us-east-1:
+  Lambda@Edge and the pre-signup Lambda both run in us-east-1, and S3 source
+  buckets must be in the same region as the Lambda function.
+
+Resources:
+  ArtifactsBucket:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: donandmartina-lambda-artifacts-us-east-1-015311074066
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256

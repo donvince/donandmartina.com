@@ -16,17 +16,40 @@ env:
   ARTIFACTS_BUCKET: donandmartina-lambda-artifacts-us-east-1-015311074066
 
 jobs:
+  # Deploy the Lambda artifacts bucket. Runs independently; subsequent jobs
+  # assume the bucket exists before uploading zips.
+  artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy artifacts stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/artifacts.yaml \
+            --stack-name donandmartina-artifacts \
+            --no-fail-on-empty-changeset \
+            --region us-east-1
+
   # Deploy the Cognito user pool (Google IdP + pre-signup allow-list Lambda).
   # Runs BEFORE the site stack because the auth-edge Lambda's config.js is
   # built from this stack's outputs (user pool id, app client id/secret,
   # hosted UI domain) — deploying them as one stack would be circular.
   cognito:
+    needs: artifacts
     runs-on: ubuntu-latest
     outputs:
       user_pool_id: ${{ steps.outputs.outputs.user_pool_id }}
       app_client_id: ${{ steps.outputs.outputs.app_client_id }}
       app_client_secret: ${{ steps.outputs.outputs.app_client_secret }}
-      cognito_domain: ${{ steps.outputs.outputs.cognito_domain }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,7 +105,6 @@ jobs:
           {
             echo "user_pool_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolId") | .OutputValue')"
             echo "app_client_id=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="UserPoolClientId") | .OutputValue')"
-            echo "cognito_domain=$(echo "$OUT" | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')"
           } >> "$GITHUB_OUTPUT"
           {
             echo "app_client_secret<<EOF_SECRET"

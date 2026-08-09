@@ -69,16 +69,6 @@ Parameters:
       Name of the EXISTING apex origin bucket (eu-west-1). This template does not
       create it; it only manages its BucketPolicy for CloudFront OAC access.
 
-  # NOTE: WwwBucketName is intentionally unused in this slice (cfn-lint emits a
-  # benign W2001). It is retained for the later www→apex / auth work.
-  WwwBucketName:
-    Type: String
-    Default: www.donandmartina.com
-    Description: >-
-      Name of the EXISTING www bucket. Currently unused by this slice (the www
-      alias is served from the same distribution/origin as the apex). Retained as
-      a parameter for future use.
-
   SiteBucketRegion:
     Type: String
     Default: eu-west-1
