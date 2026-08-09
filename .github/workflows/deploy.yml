@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 # CloudFormation can keep updating the site stack after a runner has stopped,
 # especially while old Lambda@Edge replicas drain. Queue full deployments so
@@ -24,18 +25,27 @@ env:
   ARTIFACTS_BUCKET: donandmartina-lambda-artifacts-us-east-1-015311074066
 
 jobs:
+  validate-auth:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate AWS authentication guardrails
+        run: infra/scripts/validate-aws-auth.sh --offline
+
   # Create the allow-list parameter before publishing a Lambda that reads it.
   # The called workflow can also be dispatched directly for list-only changes.
   access-config:
+    needs: validate-auth
     uses: ./.github/workflows/update-allowed-emails.yml
     secrets:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
 
   # Deploy the Lambda artifacts bucket. Runs independently; subsequent jobs
   # assume the bucket exists before uploading zips.
   artifacts:
+    needs: validate-auth
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,8 +54,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::015311074066:role/projects/donandmartina/donandmartina-ci
+          role-session-name: donandmartina-artifacts
           aws-region: us-east-1
 
       - name: Deploy artifacts stack
@@ -74,8 +84,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::015311074066:role/projects/donandmartina/donandmartina-ci
+          role-session-name: donandmartina-cognito
           aws-region: us-east-1
 
       - name: Bundle Cognito allow-list Lambda
@@ -133,8 +143,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::015311074066:role/projects/donandmartina/donandmartina-ci
+          role-session-name: donandmartina-infra
           aws-region: us-east-1
 
       - name: Wait for site stack to become updateable
@@ -260,8 +270,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::015311074066:role/projects/donandmartina/donandmartina-ci
+          role-session-name: donandmartina-site
           aws-region: eu-west-1
 
       - name: Sync to S3

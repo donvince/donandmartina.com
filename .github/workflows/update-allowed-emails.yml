@@ -3,16 +3,13 @@ name: Update allowed emails
 on:
   workflow_call:
     secrets:
-      AWS_ACCESS_KEY_ID:
-        required: true
-      AWS_SECRET_ACCESS_KEY:
-        required: true
       ALLOWED_EMAILS:
         required: true
   workflow_dispatch:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   access-config:
@@ -24,9 +21,12 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: arn:aws:iam::015311074066:role/projects/donandmartina/donandmartina-ci
+          role-session-name: donandmartina-allowed-emails
           aws-region: us-east-1
+
+      - name: Validate AWS authentication guardrails
+        run: infra/scripts/validate-aws-auth.sh
 
       - name: Normalize and validate allowed emails
         env:

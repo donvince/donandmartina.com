@@ -52,6 +52,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: donandmartina-cognito-allow-list-role
+      PermissionsBoundary: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/ProjectWorkloadBoundary
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:

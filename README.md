@@ -4,6 +4,14 @@
 
 - [us-east-1 coupling and request flow](docs/us-east-1-coupling.md)
 
+## AWS authentication
+
+GitHub Actions obtains temporary credentials through OIDC as
+`donandmartina-ci`; no AWS access-key secrets are required. Local commands keep
+using `--profile don-donandmartina`, which is installed as a role profile that
+assumes `donandmartina-operator` through the MFA-protected `don-cli` browser
+session. Region-sensitive deployment commands continue specifying `--region`.
+
 ## Path authentication configuration
 
 The decision for whether a request path needs authentication is made in `infra/lambda/auth/index.js`, inside the Lambda@Edge viewer-request handler.
