@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f6f3eb" />
+    <meta name="description" content="A small, local-first grocery list." />
+    <title>Groceries</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Local grocery list</p>
+          <h1>Groceries</h1>
+        </div>
+        <button
+          id="openAllowListButton"
+          class="icon-button"
+          type="button"
+          aria-label="Manage favourites"
+          aria-haspopup="dialog"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 6h16M4 12h16M4 18h10" />
+            <circle cx="18" cy="18" r="2" />
+          </svg>
+        </button>
+      </header>
+
+      <div id="modelStatus" class="model-status" role="status" aria-live="polite">
+        <span class="model-status__dot" aria-hidden="true"></span>
+        <span id="modelStatusText">Getting the local helper ready…</span>
+      </div>
+
+      <nav class="tab-list" aria-label="Grocery list views" role="tablist">
+        <button
+          id="addTab"
+          class="tab-button is-active"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="addView"
+        >
+          Add
+        </button>
+        <button
+          id="shopTab"
+          class="tab-button"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="shopView"
+          tabindex="-1"
+        >
+          Shop
+          <span id="activeCount" class="count-badge" aria-label="0 items">0</span>
+        </button>
+      </nav>
+
+      <section
+        id="addView"
+        class="view add-view"
+        role="tabpanel"
+        aria-labelledby="addTab"
+      >
+        <h2 class="visually-hidden">Add groceries</h2>
+
+        <section class="add-list" aria-labelledby="addListTitle">
+          <header class="add-list__header">
+            <p class="section-label">Current list</p>
+            <h2 id="addListTitle">Your groceries</h2>
+          </header>
+          <p id="addListEmpty" class="add-list__empty">
+            Add something below to start your list.
+          </p>
+          <div id="recognitionPreview" class="recognition-preview" aria-live="polite" aria-label="Recognition result" hidden></div>
+          <ul id="addList" class="add-list__items" aria-live="polite"></ul>
+        </section>
+
+        <div class="composer-wrap">
+          <div id="inputFeedback" class="input-feedback" role="status" aria-live="polite" hidden></div>
+          <p id="listeningStatus" class="listening-status" aria-live="polite" hidden>
+            <span class="listening-status__dot" aria-hidden="true"></span>
+            Listening <span id="interimTranscript"></span>
+          </p>
+          <form id="composerForm" class="composer">
+            <label class="visually-hidden" for="messageInput">Groceries to add</label>
+            <input
+              id="messageInput"
+              name="message"
+              type="text"
+              autocomplete="off"
+              enterkeyhint="send"
+              placeholder="Add milk, bread…"
+              aria-describedby="composerHint"
+            />
+            <button
+              id="micButton"
+              class="composer__button mic-button"
+              type="button"
+              aria-label="Start voice input"
+              aria-pressed="false"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <rect x="9" y="3" width="6" height="11" rx="3" />
+                <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" />
+              </svg>
+            </button>
+            <button id="sendButton" class="composer__button send-button" type="submit" aria-label="Add groceries">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m5 12 14-7-4.5 14-2.7-5.2L5 12Z" />
+                <path d="m11.8 13.8 3.7-3.7" />
+              </svg>
+            </button>
+          </form>
+          <p id="composerHint" class="composer-hint">Type or speak. Your list stays on this device.</p>
+        </div>
+      </section>
+
+      <section
+        id="shopView"
+        class="view shop-view"
+        role="tabpanel"
+        aria-labelledby="shopTab"
+        hidden
+      >
+        <div class="shop-heading">
+          <div>
+            <p class="section-label">In the supermarket</p>
+            <h2><span id="remainingCount">0</span> left to pick up</h2>
+          </div>
+          <button id="clearCompletedButton" class="text-button" type="button" disabled>
+            Clear done
+          </button>
+        </div>
+
+        <div id="emptyList" class="empty-list">
+          <div class="empty-list__icon" aria-hidden="true">✓</div>
+          <h3>Your list is empty</h3>
+          <p>Add a few groceries and they’ll appear here.</p>
+          <button id="emptyAddButton" class="primary-button" type="button">Add groceries</button>
+        </div>
+
+        <ul id="shoppingList" class="shopping-list" aria-label="Shopping list"></ul>
+      </section>
+    </main>
+
+    <dialog id="allowListDialog" class="allow-list-dialog" aria-labelledby="allowListTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <header class="sheet-header">
+        <div>
+          <p class="section-label">Quick lookup</p>
+          <h2 id="allowListTitle">Favourites</h2>
+        </div>
+        <button id="closeAllowListButton" class="icon-button" type="button" aria-label="Close favourites">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+      </header>
+      <p class="sheet-intro">
+        Groceries and shorthand you use most.
+      </p>
+
+      <form id="allowListForm" class="allow-list-form">
+        <label for="allowItemInput">Add favourite</label>
+        <div>
+          <input id="allowItemInput" name="allowedItem" type="text" autocomplete="off" placeholder="e.g. tomatoes" />
+          <button id="addFavouriteButton" class="primary-button" type="submit" disabled>Add</button>
+        </div>
+        <p id="allowListError" class="allow-list-form__error" role="alert" hidden></p>
+      </form>
+
+      <div class="allowed-items-wrap">
+        <ul id="allowListItems" class="allowed-items" aria-label="Favourite groceries"></ul>
+      </div>
+
+      <footer class="sheet-footer">
+        <button id="resetAllowListButton" class="danger-button" type="button">Reset favourites</button>
+      </footer>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

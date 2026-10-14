@@ -17,6 +17,14 @@ function isPublicHomepage(uri) {
   return uri === '/' || uri === '/index.html';
 }
 
+function isPublicShopping(uri) {
+  return uri === '/shopping' || uri === '/shopping/' || uri === '/shopping/index.html';
+}
+
+function isPublicPath(uri) {
+  return isPublicHomepage(uri) || isPublicShopping(uri) || uri === '/robots.txt';
+}
+
 // The site is served from a private S3 bucket via CloudFront Origin Access
 // Control using the S3 REST origin (not the S3 website endpoint), so S3 will
 // NOT auto-resolve directory indexes. We must rewrite directory-style paths to
@@ -63,7 +71,7 @@ exports.handler = async (event) => {
     return handleWhoami(request);
   }
 
-  if (isPublicHomepage(request.uri)) {
+  if (isPublicPath(request.uri)) {
     request.uri = rewriteToIndex(request.uri);
     return request;
   }
@@ -88,3 +96,5 @@ exports.handler = async (event) => {
 exports._rewriteToIndex = rewriteToIndex;
 exports._isAsset = isAsset;
 exports._isPublicHomepage = isPublicHomepage;
+exports._isPublicShopping = isPublicShopping;
+exports._isPublicPath = isPublicPath;

@@ -14,7 +14,14 @@ jest.mock('../config', () => ({
   callbackUrl: 'https://poc.example.com/callback',
 }), { virtual: true });
 
-const { handler, _rewriteToIndex, _isAsset, _isPublicHomepage } = require('../index');
+const {
+  handler,
+  _rewriteToIndex,
+  _isAsset,
+  _isPublicHomepage,
+  _isPublicShopping,
+  _isPublicPath,
+} = require('../index');
 const { handleGuard } = require('../guard');
 const { handleCallback } = require('../callback');
 
@@ -87,6 +94,14 @@ describe('handler routing', () => {
     const result = await handler(makeEvent('/index.html'));
     expect(result.uri).toBe('/index.html');
     expect(handleGuard).not.toHaveBeenCalled();
+  });
+
+  it('serves the shopping app without calling guard', async () => {
+    for (const uri of ['/shopping', '/shopping/', '/shopping/index.html', '/robots.txt']) {
+      const result = await handler(makeEvent(uri));
+      expect(result.uri).toBe(uri === '/shopping' || uri === '/shopping/' ? '/shopping/index.html' : uri);
+      expect(handleGuard).not.toHaveBeenCalled();
+    }
   });
 
   it('routes everything else to handleGuard', async () => {
@@ -165,5 +180,20 @@ describe('_isPublicHomepage', () => {
 
   it('does not treat other paths as the public homepage', () => {
     expect(_isPublicHomepage('/diary/')).toBe(false);
+  });
+});
+
+describe('_isPublicShopping and _isPublicPath', () => {
+  it('recognises the shopping app entry points', () => {
+    expect(_isPublicShopping('/shopping')).toBe(true);
+    expect(_isPublicShopping('/shopping/')).toBe(true);
+    expect(_isPublicShopping('/shopping/index.html')).toBe(true);
+    expect(_isPublicShopping('/shopping/app.js')).toBe(false);
+  });
+
+  it('does not make protected paths public', () => {
+    expect(_isPublicPath('/shopping/')).toBe(true);
+    expect(_isPublicPath('/robots.txt')).toBe(true);
+    expect(_isPublicPath('/diary/')).toBe(false);
   });
 });
