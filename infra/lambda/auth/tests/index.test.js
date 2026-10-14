@@ -164,6 +164,8 @@ describe('_isAsset', () => {
   it('treats known file extensions as assets', () => {
     expect(_isAsset('/favicon.ico')).toBe(true);
     expect(_isAsset('/foo.js')).toBe(true);
+    expect(_isAsset('/shopping/vendor/needle.wasm')).toBe(true);
+    expect(_isAsset('/shopping/vendor/needle3.cact')).toBe(true);
   });
 
   it('does not treat a directory path as an asset', () => {

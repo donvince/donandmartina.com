@@ -7,7 +7,7 @@ const { handleWhoami } = require('./whoami');
 const { buildLoginUrl } = require('./urls');
 const config = require('./config');
 
-const ASSET_EXTENSIONS = /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp)$/i;
+const ASSET_EXTENSIONS = /\.(css|js|wasm|cact|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp)$/i;
 
 function isAsset(uri) {
   return uri.startsWith('/assets/') || ASSET_EXTENSIONS.test(uri);

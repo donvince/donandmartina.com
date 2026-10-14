@@ -160,11 +160,11 @@ async function fetchWithProgress(url) {
 
 async function initialise() {
   report("Loading grocery model\u2026");
-  importScripts("../vendor/needle.js");
+  importScripts("./vendor/needle.js");
 
-  const wasmResponse = await fetch("../vendor/needle.wasm");
+  const wasmResponse = await fetch("./vendor/needle.wasm");
   if (!wasmResponse.ok) {
-    throw new Error(`../vendor/needle.wasm returned HTTP ${wasmResponse.status}`);
+    throw new Error(`./vendor/needle.wasm returned HTTP ${wasmResponse.status}`);
   }
 
   const wasmBinary = new Uint8Array(await wasmResponse.arrayBuffer());
@@ -178,7 +178,7 @@ async function initialise() {
   }
 
   runtime = await createNeedle({ wasmBinary });
-  const model = await fetchWithProgress("../vendor/needle3.cact");
+  const model = await fetchWithProgress("./vendor/needle3.cact");
   report("Preparing grocery recognition\u2026");
 
   const modelPointer = runtime._malloc(model.length);
