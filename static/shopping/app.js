@@ -667,7 +667,7 @@ function initialiseWorker() {
     return;
   }
   try {
-    worker = new Worker("./worker.js?v=5");
+    worker = new Worker("/shopping/worker.js?v=5");
     worker.addEventListener("message", ({ data }) => {
       if (data.type === "progress") setModelStatus(data.message || "Loading language model…");
       if (data.type === "ready") {
