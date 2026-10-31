@@ -1,28 +1,36 @@
 'use strict';
 
-const { parseCookies } = require('./cookies');
-const { verifyToken } = require('./jwt');
-const config = require('./config');
+const { resolveSession, setCookieHeader } = require('./session');
 
-async function handleWhoami(request) {
-  const cookieHeader = request.headers.cookie?.[0]?.value || '';
-  const token = parseCookies(cookieHeader).id_token;
-  let email = null;
-  if (token) {
-    try {
-      const payload = await verifyToken(token, config);
-      email = payload.email || null;
-    } catch (_) {}
-  }
-  return {
-    status: '200',
-    statusDescription: 'OK',
-    headers: {
-      'content-type': [{ key: 'Content-Type', value: 'application/json' }],
-      'cache-control': [{ key: 'Cache-Control', value: 'no-store' }],
-    },
-    body: JSON.stringify({ email }),
+function jsonResponse(status, statusDescription, body, setCookies = []) {
+  const headers = {
+    'content-type': [{ key: 'Content-Type', value: 'application/json' }],
+    'cache-control': [{ key: 'Cache-Control', value: 'no-store' }],
   };
+  if (setCookies.length) headers['set-cookie'] = setCookieHeader(setCookies);
+  return { status, statusDescription, headers, body: JSON.stringify(body) };
 }
 
-module.exports = { handleWhoami };
+async function handleWhoami(request) {
+  const session = await resolveSession(request);
+  return jsonResponse('200', 'OK', { email: session.claims?.email || null }, session.setCookies);
+}
+
+// Hands the signed-in visitor's ID token to page scripts that need to present
+// it to another AWS service (the shopping list's AppSync Events
+// subscription), refreshing it first if it has lapsed. The cookie stays
+// HttpOnly; this same-origin endpoint is the only way scripts can read it,
+// and browsers block cross-origin pages from reading the response.
+async function handleToken(request) {
+  const session = await resolveSession(request);
+  if (!session.claims) {
+    return jsonResponse('401', 'Unauthorized', { error: 'signed_out' }, session.setCookies);
+  }
+  return jsonResponse('200', 'OK', {
+    idToken: session.idToken,
+    email: session.claims.email || null,
+    expiresAt: session.claims.exp * 1000,
+  }, session.setCookies);
+}
+
+module.exports = { handleToken, handleWhoami };

@@ -53,7 +53,7 @@ exports.handler = async (event) => {
   }
 
   if (request.uri === '/logout') {
-    return handleLogout();
+    return handleLogout(request);
   }
 
   if (request.uri === '/login') {

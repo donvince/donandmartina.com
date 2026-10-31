@@ -109,6 +109,14 @@ Resources:
       LambdaConfig:
         PreSignUp: !GetAtt CognitoAllowListLambda.Arn
         PreAuthentication: !GetAtt CognitoAllowListLambda.Arn
+        # Runs on every token issue, including federated Google sign-ins
+        # (which skip PreAuthentication) and refresh-token grants (which
+        # skip every other trigger). With year-long refresh tokens this is
+        # what makes removing an email from the allow-list end access within
+        # one ID-token lifetime. V1_0 is available on every feature plan.
+        PreTokenGenerationConfig:
+          LambdaArn: !GetAtt CognitoAllowListLambda.Arn
+          LambdaVersion: V1_0
 
   UserPoolGoogleIdP:
     Type: AWS::Cognito::UserPoolIdentityProvider
@@ -149,7 +157,21 @@ Resources:
         - !Ref CallbackUrl
       LogoutURLs:
         - !Ref LogoutUrl
-      ExplicitAuthFlows: []
+      # The auth-edge Lambda swaps the refresh token for a new ID token at the
+      # hosted UI token endpoint whenever the hour-long ID token lapses, so a
+      # visitor stays signed in for as long as the refresh token lives.
+      # Keep RefreshTokenValidity in step with REFRESH_TOKEN_MAX_AGE and
+      # IdTokenValidity with ID_TOKEN_MAX_AGE in infra/lambda/auth/session.js.
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+      EnableTokenRevocation: true
+      RefreshTokenValidity: 365
+      IdTokenValidity: 60
+      AccessTokenValidity: 60
+      TokenValidityUnits:
+        RefreshToken: days
+        IdToken: minutes
+        AccessToken: minutes
 
 Outputs:
   UserPoolId:

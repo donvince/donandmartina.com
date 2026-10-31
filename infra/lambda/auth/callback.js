@@ -1,9 +1,9 @@
 'use strict';
 
-const https = require('https');
 const { verifyToken } = require('./jwt');
-const { serializeCookie } = require('./cookies');
-const { buildLoginUrl, buildSwitchAccountUrl } = require('./urls');
+const { sessionCookies, setCookieHeader } = require('./session');
+const { exchangeCode } = require('./tokens');
+const { buildLoginUrl, buildSwitchAccountUrl, safeReturnTo } = require('./urls');
 const { renderErrorPage } = require('./error-page');
 const config = require('./config');
 
@@ -36,40 +36,6 @@ function signInFailed(reason) {
   };
 }
 
-function exchangeCode(code) {
-  return new Promise((resolve, reject) => {
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      client_id: config.appClientId,
-      redirect_uri: config.callbackUrl,
-    }).toString();
-
-    const auth = Buffer.from(`${config.appClientId}:${config.appClientSecret}`).toString('base64');
-
-    const options = {
-      hostname: config.cognitoDomain,
-      path: '/oauth2/token',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${auth}`,
-      },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); } catch (e) { reject(e); }
-      });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-}
-
 async function handleCallback(request) {
   const params = new URLSearchParams(request.querystring || '');
 
@@ -92,12 +58,9 @@ async function handleCallback(request) {
     returnTo = JSON.parse(Buffer.from(stateRaw, 'base64url').toString()).returnTo || '/';
   } catch (_) {}
 
-  // Only ever redirect within this site. `state` arrives back from the browser,
-  // so an absolute URL (or a scheme-relative //evil.example.com) would make this
-  // an open redirect off the back of a genuine sign-in.
-  if (!returnTo.startsWith('/') || returnTo.startsWith('//')) {
-    returnTo = '/';
-  }
+  // `state` arrives back from the browser, so it must not become an open
+  // redirect off the back of a genuine sign-in.
+  returnTo = safeReturnTo(returnTo);
 
   // Someone hitting /callback directly, a bookmarked or re-used callback URL, or
   // Cognito redirecting without the usual params. There is nothing to exchange,
@@ -115,7 +78,7 @@ async function handleCallback(request) {
 
   let tokens;
   try {
-    tokens = await exchangeCode(code);
+    tokens = (await exchangeCode(code)).body;
   } catch (err) {
     // Network failure, or a non-JSON body from the token endpoint.
     return signInFailed(`token exchange threw: ${err.message}`);
@@ -137,20 +100,14 @@ async function handleCallback(request) {
     return signInFailed(`id_token verification failed: ${err.message}`);
   }
 
-  const cookie = serializeCookie('id_token', tokens.id_token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'Lax',
-    path: '/',
-    maxAge: 3600,
-  });
-
+  // The refresh token keeps the visitor signed in once the ID token lapses;
+  // see session.js.
   return {
     status: '302',
     statusDescription: 'Found',
     headers: {
       location: [{ key: 'Location', value: returnTo }],
-      'set-cookie': [{ key: 'Set-Cookie', value: cookie }],
+      'set-cookie': setCookieHeader(sessionCookies(tokens)),
       'cache-control': [{ key: 'Cache-Control', value: 'no-store' }],
     },
   };

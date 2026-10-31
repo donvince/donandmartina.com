@@ -23,4 +23,16 @@ function buildSwitchAccountUrl(config) {
   return `https://${config.cognitoDomain}/login?${params}`;
 }
 
-module.exports = { buildLoginUrl, buildSwitchAccountUrl };
+// Only ever redirect within this site. Return paths arrive back from the
+// browser, so an absolute URL (or a scheme-relative //evil.example.com) would
+// make sign-in an open redirect.
+function safeReturnTo(value, fallback = '/') {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
+    return fallback;
+  }
+  // Backslashes are treated as slashes by some browsers (/\evil.example.com).
+  if (value.includes('\\')) return fallback;
+  return value;
+}
+
+module.exports = { buildLoginUrl, buildSwitchAccountUrl, safeReturnTo };

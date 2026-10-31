@@ -75,6 +75,16 @@ describe('handleCallback', () => {
     expect(result.headers.location[0].value).toBe('/index.html');
   });
 
+  it('keeps the refresh token in a long-lived HttpOnly cookie', async () => {
+    mockTokenResponseBody = JSON.stringify({ id_token: 'fake.id.token', refresh_token: 'fake.refresh' });
+    const result = await handleCallback(makeCallbackRequest(`code=authcode123&state=${stateFor('/')}`));
+    const cookies = result.headers['set-cookie'].map((cookie) => cookie.value);
+    expect(cookies).toEqual([
+      'id_token=fake.id.token; HttpOnly; Secure; SameSite=Lax; Max-Age=3600; Path=/',
+      'refresh_token=fake.refresh; HttpOnly; Secure; SameSite=Lax; Max-Age=31536000; Path=/',
+    ]);
+  });
+
   it('returns error page when Cognito sends an error', async () => {
     const result = await handleCallback(makeCallbackRequest('error=access_denied&error_description=not+permitted&email=blocked@test.com'));
     expect(result.status).toBe('403');

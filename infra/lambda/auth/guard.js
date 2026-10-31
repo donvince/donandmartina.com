@@ -1,35 +1,35 @@
 'use strict';
 
-const { verifyToken } = require('./jwt');
-const { parseCookies } = require('./cookies');
+const { resolveSession, setCookieHeader } = require('./session');
 const { buildLoginUrl } = require('./urls');
 const config = require('./config');
 
-async function handleGuard(request) {
-  const cookieHeader = request.headers.cookie
-    ? request.headers.cookie[0].value
-    : '';
-  const cookies = parseCookies(cookieHeader);
-  const token = cookies.id_token;
+function redirect(location, setCookies) {
+  const headers = {
+    location: [{ key: 'Location', value: location }],
+    'cache-control': [{ key: 'Cache-Control', value: 'no-store' }],
+  };
+  if (setCookies.length) headers['set-cookie'] = setCookieHeader(setCookies);
+  return { status: '302', statusDescription: 'Found', headers };
+}
 
-  if (token) {
-    try {
-      await verifyToken(token, config);
-      return request; // valid — pass through
-    } catch (_) {
-      // invalid or expired — fall through to redirect
-    }
+async function handleGuard(request) {
+  const session = await resolveSession(request);
+  const path = request.uri || '/';
+
+  if (session.claims && !session.setCookies.length) {
+    return request; // valid — pass through
   }
 
-  const returnTo = request.uri || '/';
-  return {
-    status: '302',
-    statusDescription: 'Found',
-    headers: {
-      location: [{ key: 'Location', value: buildLoginUrl(config, returnTo) }],
-      'cache-control': [{ key: 'Cache-Control', value: 'no-store' }],
-    },
-  };
+  if (session.claims) {
+    // The ID token was refreshed. A viewer-request function can't add
+    // Set-Cookie to the origin's response, so bounce the browser back to the
+    // same URL with the new cookies; the retry passes straight through.
+    const query = request.querystring ? `?${request.querystring}` : '';
+    return redirect(`${path}${query}`, session.setCookies);
+  }
+
+  return redirect(buildLoginUrl(config, path), session.setCookies);
 }
 
 module.exports = { handleGuard };

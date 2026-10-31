@@ -41,8 +41,22 @@ describe('Cognito allow-list handler', () => {
   });
 
   it.each([
+    'TokenGeneration_HostedAuth',
+    'TokenGeneration_RefreshTokens',
+  ])('allows a permitted email for %s without changing the event', async triggerSource => {
+    const event = makeEvent('allowed@gmail.com', triggerSource);
+    const original = structuredClone(event);
+
+    await expect(handler(event)).resolves.toBe(event);
+
+    expect(event).toEqual(original);
+  });
+
+  it.each([
     'PreSignUp_ExternalProvider',
     'PreAuthentication_Authentication',
+    'TokenGeneration_HostedAuth',
+    'TokenGeneration_RefreshTokens',
   ])('rejects an email not on the list for %s', async triggerSource => {
     await expect(handler(makeEvent('stranger@gmail.com', triggerSource)))
       .rejects.toThrow('not permitted');
