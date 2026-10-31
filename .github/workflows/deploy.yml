@@ -34,10 +34,29 @@ jobs:
       - name: Validate AWS authentication guardrails
         run: infra/scripts/validate-aws-auth.sh --offline
 
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Test auth-edge Lambda
+        working-directory: infra/lambda/auth
+        run: npm ci && npm test
+
+      - name: Test Cognito allow-list Lambda
+        working-directory: infra/lambda/cognito-allow-list
+        run: npm ci && npm test
+
   # Create the allow-list parameter before publishing a Lambda that reads it.
   # The called workflow can also be dispatched directly for list-only changes.
   access-config:
-    needs: validate-auth
+    needs: [validate-auth, test]
     uses: ./.github/workflows/update-allowed-emails.yml
     secrets:
       ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
@@ -45,7 +64,7 @@ jobs:
   # Deploy the Lambda artifacts bucket. Runs independently; subsequent jobs
   # assume the bucket exists before uploading zips.
   artifacts:
-    needs: validate-auth
+    needs: [validate-auth, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
