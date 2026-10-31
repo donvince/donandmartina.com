@@ -1,4 +1,4 @@
-const { parseCookies, serializeCookie } = require('../cookies');
+const { parseCookies, requestCookies, serializeCookie } = require('../cookies');
 
 describe('parseCookies', () => {
   it('parses a single cookie', () => {
@@ -38,5 +38,20 @@ describe('serializeCookie', () => {
 
   it('omits optional attributes when not provided', () => {
     expect(serializeCookie('x', 'y')).toBe('x=y');
+  });
+
+  it('includes Max-Age=0 so the browser deletes the cookie', () => {
+    expect(serializeCookie('x', '', { maxAge: 0 })).toBe('x=; Max-Age=0');
+  });
+});
+
+describe('requestCookies', () => {
+  it('merges every cookie header CloudFront delivers', () => {
+    const request = { headers: { cookie: [{ value: 'a=1' }, { value: 'b=2; c=3' }] } };
+    expect(requestCookies(request)).toEqual({ a: '1', b: '2', c: '3' });
+  });
+
+  it('returns an empty object when there is no cookie header', () => {
+    expect(requestCookies({ headers: {} })).toEqual({});
   });
 });
