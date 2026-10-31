@@ -3,8 +3,8 @@
 const { handleGuard } = require('./guard');
 const { handleCallback } = require('./callback');
 const { handleLogout } = require('./logout');
-const { handleWhoami } = require('./whoami');
-const { buildLoginUrl } = require('./urls');
+const { handleToken, handleWhoami } = require('./whoami');
+const { buildLoginUrl, safeReturnTo } = require('./urls');
 const config = require('./config');
 
 const ASSET_EXTENSIONS = /\.(css|js|wasm|cact|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp)$/i;
@@ -17,12 +17,8 @@ function isPublicHomepage(uri) {
   return uri === '/' || uri === '/index.html';
 }
 
-function isPublicShopping(uri) {
-  return uri === '/shopping' || uri === '/shopping/' || uri === '/shopping/index.html';
-}
-
 function isPublicPath(uri) {
-  return isPublicHomepage(uri) || isPublicShopping(uri) || uri === '/robots.txt';
+  return isPublicHomepage(uri) || uri === '/robots.txt';
 }
 
 // The site is served from a private S3 bucket via CloudFront Origin Access
@@ -57,11 +53,12 @@ exports.handler = async (event) => {
   }
 
   if (request.uri === '/login') {
+    const returnTo = safeReturnTo(new URLSearchParams(request.querystring || '').get('returnTo'), '/diary/');
     return {
       status: '302',
       statusDescription: 'Found',
       headers: {
-        location: [{ key: 'Location', value: buildLoginUrl(config, '/diary/') }],
+        location: [{ key: 'Location', value: buildLoginUrl(config, returnTo) }],
         'cache-control': [{ key: 'Cache-Control', value: 'no-store' }],
       },
     };
@@ -69,6 +66,10 @@ exports.handler = async (event) => {
 
   if (request.uri === '/whoami') {
     return handleWhoami(request);
+  }
+
+  if (request.uri === '/token') {
+    return handleToken(request);
   }
 
   if (isPublicPath(request.uri)) {
@@ -96,5 +97,4 @@ exports.handler = async (event) => {
 exports._rewriteToIndex = rewriteToIndex;
 exports._isAsset = isAsset;
 exports._isPublicHomepage = isPublicHomepage;
-exports._isPublicShopping = isPublicShopping;
 exports._isPublicPath = isPublicPath;

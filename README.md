@@ -19,12 +19,12 @@ The decision for whether a request path needs authentication is made in `infra/l
 That handler explicitly bypasses authentication for:
 
 - `/` and `/index.html`, so the homepage is public
-- `/shopping/` and its static assets, so the shopping app is public without OAuth
 - `/robots.txt`, which excludes `/shopping/` from crawlers
-- `/login`, which redirects to the Cognito Hosted UI and returns to `/diary/` after sign-in
+- `/login`, which redirects to the Cognito Hosted UI and returns to `?returnTo=` (a same-site path) or `/diary/` after sign-in
 - `/callback`
 - `/logout`
 - `/whoami`
+- `/token`, which returns the signed-in visitor's ID token to same-origin scripts (401 when signed out)
 - static assets detected by `isAsset()`, including `/assets/...` and common asset file extensions such as `.css`, `.js`, `.png`, `.svg`, `.ico`, and fonts
 
 Every other path is passed to `handleGuard(request)`, which means it must have a valid Cognito-backed session/JWT or the user is redirected to sign in.

@@ -3,6 +3,10 @@
 jest.mock('../guard', () => ({
   handleGuard: jest.fn(),
 }));
+jest.mock('../whoami', () => ({
+  handleWhoami: jest.fn().mockResolvedValue({ status: '200' }),
+  handleToken: jest.fn().mockResolvedValue({ status: '200' }),
+}));
 jest.mock('../callback', () => ({
   handleCallback: jest.fn().mockResolvedValue({ status: '302' }),
 }));
@@ -19,14 +23,19 @@ const {
   _rewriteToIndex,
   _isAsset,
   _isPublicHomepage,
-  _isPublicShopping,
   _isPublicPath,
 } = require('../index');
 const { handleGuard } = require('../guard');
 const { handleCallback } = require('../callback');
+const { handleToken } = require('../whoami');
 
-function makeEvent(uri) {
-  return { Records: [{ cf: { request: { uri, headers: {}, querystring: '' } } }] };
+function makeEvent(uri, querystring = '') {
+  return { Records: [{ cf: { request: { uri, headers: {}, querystring } } }] };
+}
+
+function loginReturnTo(result) {
+  const params = new URL(result.headers.location[0].value).searchParams;
+  return JSON.parse(Buffer.from(params.get('state'), 'base64url').toString()).returnTo;
 }
 
 // Authenticated: guard hands the request straight back so the router rewrites it.
@@ -79,9 +88,26 @@ describe('handler routing', () => {
     expect(result.headers.location[0].value).toContain('https://auth.poc.example.com/login');
     expect(handleGuard).not.toHaveBeenCalled();
 
-    const params = new URL(result.headers.location[0].value).searchParams;
-    const state = JSON.parse(Buffer.from(params.get('state'), 'base64url').toString());
-    expect(state.returnTo).toBe('/diary/');
+    expect(loginReturnTo(result)).toBe('/diary/');
+  });
+
+  it('returns /login visitors to a same-site returnTo path', async () => {
+    const result = await handler(makeEvent('/login', 'returnTo=%2Fshopping%2F'));
+    expect(loginReturnTo(result)).toBe('/shopping/');
+  });
+
+  it.each(['https%3A%2F%2Fevil.example.com', '%2F%2Fevil.example.com', '%2F%5Cevil.example.com'])(
+    'ignores an off-site /login returnTo (%s)',
+    async (returnTo) => {
+      const result = await handler(makeEvent('/login', `returnTo=${returnTo}`));
+      expect(loginReturnTo(result)).toBe('/diary/');
+    },
+  );
+
+  it('routes /token to handleToken', async () => {
+    await handler(makeEvent('/token'));
+    expect(handleToken).toHaveBeenCalled();
+    expect(handleGuard).not.toHaveBeenCalled();
   });
 
   it('serves the homepage without calling guard', async () => {
@@ -96,13 +122,21 @@ describe('handler routing', () => {
     expect(handleGuard).not.toHaveBeenCalled();
   });
 
-  it('serves the shopping app without calling guard', async () => {
-    for (const uri of ['/shopping', '/shopping/', '/shopping/index.html', '/robots.txt']) {
-      const result = await handler(makeEvent(uri));
-      expect(result.uri).toBe(uri === '/shopping' || uri === '/shopping/' ? '/shopping/index.html' : uri);
-      expect(handleGuard).not.toHaveBeenCalled();
-    }
+  it('serves robots.txt without calling guard', async () => {
+    const result = await handler(makeEvent('/robots.txt'));
+    expect(result.uri).toBe('/robots.txt');
+    expect(handleGuard).not.toHaveBeenCalled();
   });
+
+  it.each(['/shopping', '/shopping/', '/shopping/index.html'])(
+    'requires sign-in for the shopping app at %s',
+    async (uri) => {
+      authenticate();
+      const result = await handler(makeEvent(uri));
+      expect(handleGuard).toHaveBeenCalled();
+      expect(result.uri).toBe('/shopping/index.html');
+    },
+  );
 
   it('routes everything else to handleGuard', async () => {
     authenticate();
@@ -185,17 +219,11 @@ describe('_isPublicHomepage', () => {
   });
 });
 
-describe('_isPublicShopping and _isPublicPath', () => {
-  it('recognises the shopping app entry points', () => {
-    expect(_isPublicShopping('/shopping')).toBe(true);
-    expect(_isPublicShopping('/shopping/')).toBe(true);
-    expect(_isPublicShopping('/shopping/index.html')).toBe(true);
-    expect(_isPublicShopping('/shopping/app.js')).toBe(false);
-  });
-
-  it('does not make protected paths public', () => {
-    expect(_isPublicPath('/shopping/')).toBe(true);
+describe('_isPublicPath', () => {
+  it('only makes the homepage and robots.txt public', () => {
+    expect(_isPublicPath('/')).toBe(true);
     expect(_isPublicPath('/robots.txt')).toBe(true);
+    expect(_isPublicPath('/shopping/')).toBe(false);
     expect(_isPublicPath('/diary/')).toBe(false);
   });
 });
