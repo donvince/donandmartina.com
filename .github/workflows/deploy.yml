@@ -58,7 +58,7 @@ jobs:
         run: npm ci && npm test
 
       - name: Test shopping app model
-        run: node --test tests/shopping/
+        run: node --test tests/shopping/*.test.mjs
 
   # Create the allow-list parameter before publishing a Lambda that reads it.
   # The called workflow can also be dispatched directly for list-only changes.

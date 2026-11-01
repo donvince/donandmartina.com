@@ -65,7 +65,7 @@ offline wait in a localStorage queue and are sent when the connection returns.
 Tests:
 
 ```bash
-node --test tests/shopping/
+node --test tests/shopping/*.test.mjs
 (cd infra/lambda/shopping-api && npm test)
 ```
 
