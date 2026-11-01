@@ -1,16 +1,20 @@
-const STORAGE_KEY = "groceries-state-v1";
+import {
+  canonicalName as canonicalFrom,
+  cleanName,
+  favouriteAutocomplete as autocompleteFrom,
+  favouritesFor as favouritesFrom,
+  favouriteTerms,
+  formatNames,
+  keyFor,
+  makeId,
+  normaliseFavourite,
+  requestWords,
+  starterFavourites,
+  stripRequestWords,
+  uniqueFavourites,
+} from "./model/groceries.js";
 
-const STARTER_FAVOURITES = [
-  ["wholemeal bread", ["whole meal bread"]], ["white bread"], ["sourdough"], ["rolls"],
-  ["croissants"], ["pain au chocolat"], ["milk"], ["Lurpak butter"], ["Kerrygold butter"],
-  ["eggs"], ["cheddar"], ["mozzarella"], ["soft cheese"], ["yoghurt", ["yogurt"]],
-  ["houmous", ["hummus"]], ["avocado"], ["cucumber"], ["carrots"], ["bananas"],
-  ["apples"], ["baked beans"], ["pasta"], ["pesto"], ["cereal"], ["Weetabix"],
-  ["bran flakes"], ["tea"], ["coffee"], ["sweet chilli sauce"], ["orange juice", ["OJ"]],
-  ["squash"], ["water"], ["smoothies"], ["Pepsi Max"], ["crisps"], ["Hula Hoops"],
-  ["lentil crisps"], ["Ritz crackers"], ["Kinder chocolate"], ["fruit lollies"], ["pizza"],
-  ["frozen potatoes"], ["toilet roll"], ["kitchen roll"], ["fabric conditioner"],
-].map(([name, aliases = []]) => ({ name, aliases }));
+const STORAGE_KEY = "groceries-state-v1";
 
 const elements = Object.fromEntries(
   [
@@ -36,40 +40,6 @@ let suppressSpeechSubmit = false;
 let suppressFavouriteAutocomplete = false;
 let appliedFavouriteSuggestion = "";
 
-function cleanName(value) {
-  return String(value ?? "").trim().replace(/\s+/g, " ");
-}
-
-function keyFor(value) {
-  return cleanName(value).toLocaleLowerCase();
-}
-
-function normaliseFavourite(value) {
-  const name = cleanName(typeof value === "string" ? value : value?.name);
-  if (!name) return null;
-  const aliases = Array.isArray(value?.aliases)
-    ? [...new Map(value.aliases.map(cleanName).filter(Boolean).map((alias) => [keyFor(alias), alias])).values()]
-        .filter((alias) => keyFor(alias) !== keyFor(name))
-    : [];
-  return { name, aliases };
-}
-
-function uniqueFavourites(values) {
-  const favourites = new Map();
-  for (const value of values) {
-    const favourite = normaliseFavourite(value);
-    if (favourite) favourites.set(keyFor(favourite.name), favourite);
-  }
-  return [...favourites.values()];
-}
-
-function starterFavourites() {
-  return STARTER_FAVOURITES.map((favourite) => ({
-    name: favourite.name,
-    aliases: [...favourite.aliases],
-  }));
-}
-
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -94,10 +64,6 @@ function loadState() {
   }
 }
 
-function makeId() {
-  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -106,25 +72,12 @@ function saveState() {
   }
 }
 
-function implicitTerms(name) {
-  return keyFor(name).split(/[^\p{L}\p{N}']+/u).filter((term) => term.length > 2);
-}
-
-function favouriteTerms(favourite) {
-  return [...new Set([favourite.name, ...favourite.aliases, ...implicitTerms(favourite.name)])];
-}
-
 function favouritesFor(value) {
-  const key = keyFor(value);
-  if (!key) return [];
-  return state.favourites.filter((favourite) =>
-    favouriteTerms(favourite).some((term) => keyFor(term) === key),
-  );
+  return favouritesFrom(state.favourites, value);
 }
 
 function canonicalName(value) {
-  const matches = favouritesFor(value);
-  return matches.length === 1 ? matches[0].name : null;
+  return canonicalFrom(state.favourites, value);
 }
 
 function setModelStatus(message, kind = "loading") {
@@ -154,23 +107,9 @@ function clearFavouriteError() {
   if (elements.allowListError) elements.allowListError.hidden = true;
 }
 
-function favouriteAutocomplete(value) {
-  const key = keyFor(value);
-  if (!key) return "";
-  const matches = state.favourites.filter((favourite) =>
-    favouriteTerms(favourite).some((term) => keyFor(term).includes(key)),
-  );
-  if (matches.length !== 1) return "";
-  const candidates = new Map(favouriteTerms(matches[0]).filter((term) => {
-    const candidateKey = keyFor(term);
-    return candidateKey.startsWith(key) && candidateKey !== key;
-  }).map((term) => [keyFor(term), term]));
-  return candidates.size === 1 ? [...candidates.values()][0] : "";
-}
-
 function updateFavouriteInput({ autocomplete = true } = {}) {
   const value = cleanName(elements.allowItemInput?.value);
-  const suggestion = favouriteAutocomplete(value);
+  const suggestion = autocompleteFrom(state.favourites, value);
   if (autocomplete && suggestion && elements.allowItemInput) {
     const suffix = suggestion.slice(value.length);
     elements.allowItemInput.value = `${value}${suffix}`;
@@ -216,16 +155,6 @@ function setInputFeedback(text = "", actions = []) {
     }
     elements.inputFeedback.append(controls);
   }
-}
-
-function formatNames(names) {
-  if (names.length < 2) return names[0] || "";
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
-}
-
-function requestWords(prompt) {
-  return cleanName(prompt).match(/[\p{L}\p{N}']+/gu) || [];
 }
 
 function showRecognition(prompt, recognised = []) {
@@ -497,13 +426,6 @@ function showVariantChoice(favourites) {
       onClick: () => replyForAdd(addGroceries([favourite.name])),
     })),
   );
-}
-
-function stripRequestWords(value) {
-  return cleanName(value)
-    .replace(/^(?:please\s+)?(?:can you\s+)?(?:add|buy|get|need|pick up|i need|we need)\s+/i, "")
-    .replace(/\s+(?:please|thanks|thank you)[.!?]*$/i, "")
-    .replace(/^[\s,]+|[\s,.!?]+$/g, "");
 }
 
 function setComposerBusy(busy) {

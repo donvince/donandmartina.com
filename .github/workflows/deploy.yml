@@ -57,6 +57,9 @@ jobs:
         working-directory: infra/lambda/shopping-api
         run: npm ci && npm test
 
+      - name: Test shopping app model
+        run: node --test tests/shopping/
+
   # Create the allow-list parameter before publishing a Lambda that reads it.
   # The called workflow can also be dispatched directly for list-only changes.
   access-config:
