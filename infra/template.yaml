@@ -38,9 +38,11 @@ Description: >-
 #   this inside the Lambda@Edge auth handler (a CloudFront Function can't
 #   coexist with the viewer-request Lambda@Edge association below).
 #
-# * DEPLOY ORDER for this slice: infra/cognito.yaml FIRST (creates the user
-#   pool / app client the auth-edge Lambda's config.js is built from), THEN
-#   this template. Both are deployed by the same GHA workflow, in that order.
+# * DEPLOY ORDER: infra/cognito.yaml FIRST (creates the user pool / app
+#   client the auth-edge Lambda's config.js is built from), then
+#   infra/shopping.yaml (exports the shopping API function URL this template
+#   imports for /api/*), THEN this template. The same GHA workflow deploys
+#   all three in that order.
 # ─────────────────────────────────────────────────────────────────────────────
 
 Parameters:
@@ -120,6 +122,18 @@ Resources:
         SigningBehavior: always
         SigningProtocol: sigv4
 
+  # OAC for the shopping API's Lambda function URL (/api/* behaviour below).
+  # The URL uses AWS_IAM auth, so only this distribution can reach it.
+  ShoppingApiOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${DomainName}-shopping-api-oac"
+        Description: OAC signing CloudFront requests to the shopping API function URL.
+        OriginAccessControlOriginType: lambda
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
   # ── Auth Lambda@Edge (viewer-request: JWT check, /callback, index rewrite) ──
   # Must live in us-east-1 (this stack's region) — Lambda@Edge requirement.
   AuthEdgeLambdaRole:
@@ -191,6 +205,30 @@ Resources:
             OriginAccessControlId: !GetAtt CloudFrontOAC.Id
             S3OriginConfig:
               OriginAccessIdentity: ''
+          - Id: ShoppingApiOrigin
+            DomainName: !ImportValue donandmartina-shopping-ApiFunctionUrlDomain
+            OriginAccessControlId: !GetAtt ShoppingApiOAC.Id
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        # The shopping API authenticates each request itself from the session
+        # cookie, so this behaviour has no Lambda@Edge. Browsers must send
+        # x-amz-content-sha256 with POST bodies: Lambda OAC signs the payload
+        # hash rather than the body.
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: ShoppingApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            # AWS managed "CachingDisabled" cache policy.
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # AWS managed "AllViewerExceptHostHeader" origin request policy:
+            # forwards cookies, query strings and headers, but not Host,
+            # which must be the function URL's own for the signature to match.
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
@@ -199,6 +237,28 @@ Resources:
           LambdaFunctionAssociations:
             - EventType: viewer-request
               LambdaFunctionARN: !Ref AuthEdgeLambdaVersion
+
+  # ── Shopping API invoke permissions ───────────────────────────────────────
+  # Function URLs with AWS_IAM auth need both actions granted to the caller.
+  # They live here rather than in infra/shopping.yaml because they name this
+  # distribution, which is created after the function.
+  ShoppingApiInvokeUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !ImportValue donandmartina-shopping-ApiFunctionArn
+      Action: lambda:InvokeFunctionUrl
+      FunctionUrlAuthType: AWS_IAM
+      Principal: cloudfront.amazonaws.com
+      SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  ShoppingApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !ImportValue donandmartina-shopping-ApiFunctionArn
+      Action: lambda:InvokeFunction
+      InvokedViaFunctionUrl: true
+      Principal: cloudfront.amazonaws.com
+      SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
 
   # ── Apex bucket policy (bucket itself is pre-existing, not managed here) ─────
   SiteBucketPolicy:
