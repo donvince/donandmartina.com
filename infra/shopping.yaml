@@ -1,0 +1,191 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  donandmartina.com shopping list backend: a DynamoDB table holding every
+  cart, a Lambda API (served through the site's CloudFront distribution at
+  /api/*), and an AppSync Events API that tells open pages when a cart
+  changes.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HOW THE PIECES FIT
+#
+# * The browser reads and writes carts through /api/shopping on the site's own
+#   domain. CloudFront forwards /api/* to this stack's Lambda function URL,
+#   signing requests with Origin Access Control (infra/template.yaml), so the
+#   function URL itself only accepts CloudFront. The Lambda verifies the
+#   visitor's id_token session cookie on every request.
+#
+# * After a write, the Lambda publishes a "cart-changed" event (no list
+#   contents) to /shopping/<cartId> on the Events API. Pages subscribe with the
+#   visitor's Cognito ID token, fetched from the auth-edge /token endpoint.
+#   Only the Lambda's role can publish.
+#
+# * DEPLOY ORDER: after infra/cognito.yaml (this stack needs the user pool and
+#   app client ids) and before infra/template.yaml (which imports the function
+#   URL to add the /api/* origin).
+# ─────────────────────────────────────────────────────────────────────────────
+
+Parameters:
+
+  UserPoolId:
+    Type: String
+    Description: Cognito user pool id (donandmartina-cognito stack output).
+
+  UserPoolClientId:
+    Type: String
+    Description: Cognito app client id (donandmartina-cognito stack output).
+
+  ShoppingApiLambdaS3Bucket:
+    Type: String
+    Description: Artifacts bucket holding the shopping API Lambda zip.
+
+  ShoppingApiLambdaS3Key:
+    Type: String
+    Default: shopping-api.zip
+
+  ShoppingApiLambdaS3ObjectVersion:
+    Type: String
+    Description: >-
+      S3 object version id of the zip above, so CloudFormation redeploys the
+      function when the code changes under the fixed key.
+
+  EventsNamespace:
+    Type: String
+    Default: shopping
+    Description: AppSync Events channel namespace; carts publish to /<namespace>/<cartId>.
+
+Resources:
+
+  # ── Data ────────────────────────────────────────────────────────────────────
+  # One partition per cart (cartId, e.g. "home"); sort keys item#<id>,
+  # favourite#<name> and meta. See infra/lambda/shopping-api/cart.js.
+  ShoppingTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: donandmartina-shopping
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: cartId
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: cartId
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      DeletionProtectionEnabled: true
+
+  # ── Change notifications ────────────────────────────────────────────────────
+  ShoppingEventsApi:
+    Type: AWS::AppSync::Api
+    Properties:
+      Name: donandmartina-shopping-events
+      EventConfig:
+        AuthProviders:
+          - AuthType: AMAZON_COGNITO_USER_POOLS
+            CognitoConfig:
+              AwsRegion: !Ref AWS::Region
+              UserPoolId: !Ref UserPoolId
+              AppIdClientRegex: !Sub '^${UserPoolClientId}$'
+          - AuthType: AWS_IAM
+        ConnectionAuthModes:
+          - AuthType: AMAZON_COGNITO_USER_POOLS
+          - AuthType: AWS_IAM
+        DefaultSubscribeAuthModes:
+          - AuthType: AMAZON_COGNITO_USER_POOLS
+        DefaultPublishAuthModes:
+          - AuthType: AWS_IAM
+
+  ShoppingEventsNamespace:
+    Type: AWS::AppSync::ChannelNamespace
+    Properties:
+      ApiId: !GetAtt ShoppingEventsApi.ApiId
+      Name: !Ref EventsNamespace
+      SubscribeAuthModes:
+        - AuthType: AMAZON_COGNITO_USER_POOLS
+      PublishAuthModes:
+        - AuthType: AWS_IAM
+
+  # ── API ─────────────────────────────────────────────────────────────────────
+  ShoppingApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: donandmartina-shopping-api-role
+      PermissionsBoundary: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/ProjectWorkloadBoundary
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: ShoppingData
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: !GetAtt ShoppingTable.Arn
+              - Effect: Allow
+                Action: appsync:EventPublish
+                Resource: !GetAtt ShoppingEventsNamespace.ChannelNamespaceArn
+
+  ShoppingApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: donandmartina-shopping-api
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Role: !GetAtt ShoppingApiRole.Arn
+      Timeout: 10
+      MemorySize: 256
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ShoppingTable
+          USER_POOL_ID: !Ref UserPoolId
+          USER_POOL_CLIENT_ID: !Ref UserPoolClientId
+          EVENTS_HTTP_DOMAIN: !GetAtt ShoppingEventsApi.Dns.Http
+          EVENTS_REALTIME_DOMAIN: !GetAtt ShoppingEventsApi.Dns.Realtime
+          EVENTS_NAMESPACE: !Ref EventsNamespace
+      Code:
+        S3Bucket: !Ref ShoppingApiLambdaS3Bucket
+        S3Key: !Ref ShoppingApiLambdaS3Key
+        S3ObjectVersion: !Ref ShoppingApiLambdaS3ObjectVersion
+
+  # AWS_IAM auth: only CloudFront, signing with OAC, may call the URL. The
+  # matching invoke permissions live in infra/template.yaml beside the
+  # distribution they name.
+  ShoppingApiFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt ShoppingApiFunction.Arn
+      AuthType: AWS_IAM
+
+Outputs:
+  TableName:
+    Value: !Ref ShoppingTable
+  ApiFunctionArn:
+    Value: !GetAtt ShoppingApiFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiFunctionArn
+  ApiFunctionUrlDomain:
+    Description: Function URL host name, for the CloudFront /api/* origin.
+    Value: !Select [2, !Split ['/', !GetAtt ShoppingApiFunctionUrl.FunctionUrl]]
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiFunctionUrlDomain
+  EventsHttpDomain:
+    Value: !GetAtt ShoppingEventsApi.Dns.Http
+  EventsRealtimeDomain:
+    Value: !GetAtt ShoppingEventsApi.Dns.Realtime

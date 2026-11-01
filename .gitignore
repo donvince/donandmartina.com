@@ -10,6 +10,7 @@ infra/lambda/**/*.zip
 # The bundle steps zip into the repo root, not next to the sources.
 /cognito-allow-list.zip
 /auth-edge.zip
+/shopping-api.zip
 
 # Local
 .DS_Store

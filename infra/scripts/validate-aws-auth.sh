@@ -18,7 +18,7 @@ command -v ruby >/dev/null 2>&1 || fail "Ruby is required for structural templat
 ruby infra/scripts/validate-aws-auth.rb
 
 if [[ "${1:-}" != --offline ]]; then
-  for template in infra/access-config.yaml infra/artifacts.yaml infra/cognito.yaml infra/template.yaml; do
+  for template in infra/access-config.yaml infra/artifacts.yaml infra/cognito.yaml infra/shopping.yaml infra/template.yaml; do
     aws cloudformation validate-template \
       --template-body "file://${REPOSITORY_ROOT}/${template}" \
       --region us-east-1 >/dev/null

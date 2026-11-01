@@ -53,6 +53,10 @@ jobs:
         working-directory: infra/lambda/cognito-allow-list
         run: npm ci && npm test
 
+      - name: Test shopping API Lambda
+        working-directory: infra/lambda/shopping-api
+        run: npm ci && npm test
+
   # Create the allow-list parameter before publishing a Lambda that reads it.
   # The called workflow can also be dispatched directly for list-only changes.
   access-config:
@@ -149,9 +153,53 @@ jobs:
             echo "EOF_SECRET"
           } >> "$GITHUB_OUTPUT"
 
+  # Deploy the shopping list backend (DynamoDB, API Lambda, AppSync Events).
+  # Runs after Cognito, whose user pool it authorises against, and before the
+  # site stack, which imports its function URL for the /api/* origin.
+  shopping:
+    needs: cognito
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::015311074066:role/projects/donandmartina/donandmartina-ci
+          role-session-name: donandmartina-shopping
+          aws-region: us-east-1
+
+      - name: Bundle shopping API Lambda
+        working-directory: infra/lambda/shopping-api
+        run: |
+          npm ci --omit=dev
+          zip -r ../../../shopping-api.zip . -x 'tests/*'
+
+      - name: Upload shopping API zip
+        id: upload_shopping_api
+        run: |
+          aws s3 cp shopping-api.zip "s3://${ARTIFACTS_BUCKET}/shopping-api.zip" --region us-east-1
+          VERSION_ID=$(aws s3api head-object --bucket "${ARTIFACTS_BUCKET}" --key shopping-api.zip --region us-east-1 --query VersionId --output text)
+          echo "version_id=$VERSION_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy shopping stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/shopping.yaml \
+            --stack-name donandmartina-shopping \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --region us-east-1 \
+            --parameter-overrides \
+              UserPoolId="${{ needs.cognito.outputs.user_pool_id }}" \
+              UserPoolClientId="${{ needs.cognito.outputs.app_client_id }}" \
+              ShoppingApiLambdaS3Bucket="${ARTIFACTS_BUCKET}" \
+              ShoppingApiLambdaS3ObjectVersion="${{ steps.upload_shopping_api.outputs.version_id }}"
+
   # Deploy the CloudFront + ACM + DNS + auth-edge Lambda@Edge stack.
   infra:
-    needs: cognito
+    needs: [cognito, shopping]
     runs-on: ubuntu-latest
     outputs:
       distribution_id: ${{ steps.outputs.outputs.distribution_id }}

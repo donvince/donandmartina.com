@@ -3,9 +3,9 @@
 require 'yaml'
 
 root = File.expand_path('../..', __dir__)
-%w[infra/template.yaml infra/cognito.yaml].each do |relative|
+%w[infra/template.yaml infra/cognito.yaml infra/shopping.yaml].each do |relative|
   path = File.join(root, relative)
-  source = File.read(path).gsub(/!(?:Sub|Ref|GetAtt)\s+/, '')
+  source = File.read(path).gsub(/!(?:Sub|Ref|GetAtt|Select|Split|ImportValue)\s+/, '')
   template = YAML.safe_load(source, permitted_classes: [], aliases: false)
 
   template.fetch('Resources', {}).each do |logical_id, resource|

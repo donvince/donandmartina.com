@@ -1,0 +1,19 @@
+{
+  "name": "shopping-api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/client-dynamodb": "^3.1161.0",
+    "@aws-sdk/lib-dynamodb": "^3.1161.0",
+    "@smithy/signature-v4": "^5.7.5",
+    "aws-jwt-verify": "^5.2.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
