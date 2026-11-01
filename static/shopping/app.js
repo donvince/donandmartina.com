@@ -6,6 +6,7 @@ import { createShoppingApi } from "./model/api.js";
 import { HOME_CART } from "./model/cart.js";
 import { createGroceryModel } from "./model/grocery-model.js";
 import { makeId } from "./model/groceries.js";
+import { createCartEvents } from "./model/realtime.js";
 import { createSession } from "./model/session.js";
 import { createCartStore } from "./model/store.js";
 import { createComposerView } from "./view/composer-view.js";
@@ -68,12 +69,33 @@ elements.shopTab?.addEventListener("click", () => selectView("shop"));
 elements.emptyAddButton?.addEventListener("click", () => selectView("add"));
 
 // ── Sync ────────────────────────────────────────────────────────────────────
-// Load everything now, and catch up whenever the connection returns or the
-// page comes back into view (a phone may have slept through changes).
+// Load everything now; reload when another device changes the cart (an
+// AppSync Events notification), and catch up whenever the connection returns
+// or the page comes back into view (a phone may have slept through changes).
+let cartEvents = null;
+function listenForChanges() {
+  const { realtime } = store.getState();
+  if (cartEvents || !realtime) return;
+  cartEvents = createCartEvents({
+    realtime,
+    cartId: HOME_CART,
+    clientId,
+    getToken: () => session.getToken(),
+    onChange: () => store.sync(),
+  });
+  cartEvents.start();
+}
+store.subscribe(listenForChanges);
+
 store.sync();
-window.addEventListener("online", () => store.sync());
+window.addEventListener("online", () => {
+  store.sync();
+  cartEvents?.nudge();
+});
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") store.sync();
+  if (document.visibilityState !== "visible") return;
+  store.sync();
+  cartEvents?.nudge();
 });
 
 selectView("add");
