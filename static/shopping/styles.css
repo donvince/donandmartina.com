@@ -114,6 +114,28 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 .icon-button:hover { background: var(--green-soft); }
 .icon-button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 1.8; }
 
+.sync-status {
+  margin: 0 20px 12px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.sync-status[hidden] { display: none; }
+
+.sync-status[data-state="signed-out"],
+.sync-status[data-state="error"] {
+  background: #f8e7e4;
+  border-color: #e6c3be;
+}
+
+.sync-status a { color: var(--green-dark); font-weight: 750; }
+
 .model-status {
   display: flex;
   align-items: center;
@@ -564,7 +586,7 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 
 @media (max-width: 360px) {
   .app-header, .add-view, .shop-view { padding-inline: 14px; }
-  .tab-list, .model-status { margin-inline: 14px; }
+  .tab-list, .model-status, .sync-status { margin-inline: 14px; }
   .composer { grid-template-columns: minmax(0, 1fr) 44px 44px; gap: 4px; }
   .composer__button { width: 44px; height: 44px; }
   .composer input { padding-inline: 5px; font-size: 0.92rem; }

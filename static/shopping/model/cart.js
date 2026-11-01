@@ -77,3 +77,32 @@ function applyOp(cart, op) {
 export function applyOps(cart, ops) {
   return ops.reduce(applyOp, cart);
 }
+
+// Limits the server enforces. The server rejects a whole batch if any
+// operation breaks them, so the page drops such operations up front.
+export const MAX_NAME_LENGTH = 120;
+export const MAX_ALIASES = 20;
+const ITEM_ID = /^[A-Za-z0-9-]{1,64}$/;
+
+function validName(name) {
+  return typeof name === "string" && name.trim().length > 0 && name.trim().length <= MAX_NAME_LENGTH;
+}
+
+function validFavourite(favourite) {
+  return validName(favourite?.name)
+    && Array.isArray(favourite.aliases)
+    && favourite.aliases.length <= MAX_ALIASES
+    && favourite.aliases.every(validName);
+}
+
+export function isValidOp(op) {
+  switch (op?.type) {
+    case "addItem": return ITEM_ID.test(op.id) && validName(op.name) && Number.isFinite(op.createdAt);
+    case "setChecked": return ITEM_ID.test(op.id) && typeof op.checked === "boolean";
+    case "removeItem": return ITEM_ID.test(op.id);
+    case "putFavourite": return validFavourite(op.favourite) && (op.previousName == null || validName(op.previousName));
+    case "removeFavourite": return validName(op.name);
+    case "replaceFavourites": return Array.isArray(op.favourites) && op.favourites.every(validFavourite);
+    default: return false;
+  }
+}

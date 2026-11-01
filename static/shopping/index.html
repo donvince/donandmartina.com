@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#f6f3eb" />
-    <meta name="description" content="A small, local-first grocery list." />
+    <meta name="description" content="Our shared grocery list." />
     <title>Groceries</title>
     <link rel="stylesheet" href="/shopping/styles.css" />
   </head>
@@ -12,7 +12,7 @@
     <main class="app-shell">
       <header class="app-header">
         <div>
-          <p class="eyebrow">Local grocery list</p>
+          <p class="eyebrow">Home list</p>
           <h1>Groceries</h1>
         </div>
         <button
@@ -28,6 +28,8 @@
           </svg>
         </button>
       </header>
+
+      <p id="syncStatus" class="sync-status" role="status" aria-live="polite">Loading your list…</p>
 
       <div id="modelStatus" class="model-status" role="status" aria-live="polite">
         <span class="model-status__dot" aria-hidden="true"></span>
@@ -115,7 +117,7 @@
               </svg>
             </button>
           </form>
-          <p id="composerHint" class="composer-hint">Type or speak. Your list stays on this device.</p>
+          <p id="composerHint" class="composer-hint">Type or speak. Your list syncs across your devices.</p>
         </div>
       </section>
 
