@@ -41,7 +41,7 @@ export ARTIFACTS_BUCKET=donandmartina-lambda-artifacts-us-east-1-015311074066
 ```
 
 Do **not** use the `[default]` AWS profile — it is Skyscanner SSO and will prompt for a work
-login. Verify: `aws sts get-caller-identity` should show `user/donandmartina-gha`.
+login. Verify: `aws sts get-caller-identity` should show `assumed-role/donandmartina-operator/`.
 
 Secrets cannot be read back out of GitHub, so pull them from 1Password:
 
@@ -64,26 +64,24 @@ Skip what has not changed; each stage is independent.
 
 | Changed | Run |
 |---|---|
-| Site content, layouts, static files | job 3 only |
+| Site content, layouts, static files (including `static/shopping/`) | job 3 only |
 | `infra/lambda/auth/**`, `infra/template.yaml` | jobs 2, 3 |
-| `infra/lambda/pre-signup/**`, `infra/cognito.yaml`, allow-list | jobs 1, 2, 3 |
+| `infra/lambda/shopping-api/**`, `infra/shopping.yaml` | job 1b (needs job 1's outputs) |
+| `infra/lambda/cognito-allow-list/**`, `infra/cognito.yaml` | jobs 1, 1b, 2, 3 |
 
-Job 1's outputs feed job 2's config, so running 1 means running 2.
+Job 1's outputs feed jobs 1b and 2, so running 1 means running both. The allow-list itself
+lives in Parameter Store; change it with the **Update allowed emails** workflow, not here.
 
 ## Job 1 — cognito
 
 ```bash
-node -e "const e=process.env.ALLOWED_EMAILS.split(',').map(s=>s.trim()).filter(Boolean);\
-console.log(\"'use strict';\nmodule.exports = { allowedEmails: \"+JSON.stringify(e)+\" };\")" \
-  > infra/lambda/pre-signup/config.js
+(cd infra/lambda/cognito-allow-list && npm ci --omit=dev && \
+   rm -f ../../../cognito-allow-list.zip && \
+   zip -r ../../../cognito-allow-list.zip . -x '*.test.js' 'tests/*')
 
-(cd infra/lambda/pre-signup && npm ci --omit=dev && \
-   rm -f ../../../pre-signup.zip && \
-   zip -r ../../../pre-signup.zip . -x '*.test.js' 'tests/*' 'config.example.js')
-
-aws s3 cp pre-signup.zip "s3://$ARTIFACTS_BUCKET/pre-signup.zip" --region us-east-1
-PRESIGNUP_VERSION=$(aws s3api head-object --bucket "$ARTIFACTS_BUCKET" \
-  --key pre-signup.zip --region us-east-1 --query VersionId --output text)
+aws s3 cp cognito-allow-list.zip "s3://$ARTIFACTS_BUCKET/cognito-allow-list.zip" --region us-east-1
+ALLOW_LIST_VERSION=$(aws s3api head-object --bucket "$ARTIFACTS_BUCKET" \
+  --key cognito-allow-list.zip --region us-east-1 --query VersionId --output text)
 
 aws cloudformation deploy \
   --template-file infra/cognito.yaml --stack-name donandmartina-cognito \
@@ -92,11 +90,11 @@ aws cloudformation deploy \
   --parameter-overrides \
     GoogleClientId="$GOOGLE_CLIENT_ID" \
     GoogleClientSecret="$GOOGLE_CLIENT_SECRET" \
-    PreSignupLambdaS3Bucket="$ARTIFACTS_BUCKET" \
-    PreSignupLambdaS3ObjectVersion="$PRESIGNUP_VERSION"
+    CognitoAllowListLambdaS3Bucket="$ARTIFACTS_BUCKET" \
+    CognitoAllowListLambdaS3ObjectVersion="$ALLOW_LIST_VERSION"
 ```
 
-Then capture the outputs job 2 needs:
+Then capture the outputs jobs 1b and 2 need:
 
 ```bash
 OUT=$(aws cloudformation describe-stacks --stack-name donandmartina-cognito \
@@ -106,6 +104,34 @@ export APP_CLIENT_ID=$(jq -r '.[]|select(.OutputKey=="UserPoolClientId").OutputV
 export APP_CLIENT_SECRET=$(jq -r '.[]|select(.OutputKey=="UserPoolClientSecret").OutputValue' <<<"$OUT")
 export COGNITO_DOMAIN=$(jq -r '.[]|select(.OutputKey=="CognitoDomain").OutputValue' <<<"$OUT")
 ```
+
+## Job 1b — shopping backend
+
+Must run before job 2 whenever its stack is new or its exports change: the site stack imports
+`donandmartina-shopping-ApiFunctionUrlDomain` and `-ApiFunctionArn` for the `/api/*` origin.
+
+```bash
+(cd infra/lambda/shopping-api && npm ci --omit=dev && \
+   rm -f ../../../shopping-api.zip && \
+   zip -r ../../../shopping-api.zip . -x 'tests/*')
+
+aws s3 cp shopping-api.zip "s3://$ARTIFACTS_BUCKET/shopping-api.zip" --region us-east-1
+SHOPPING_VERSION=$(aws s3api head-object --bucket "$ARTIFACTS_BUCKET" \
+  --key shopping-api.zip --region us-east-1 --query VersionId --output text)
+
+aws cloudformation deploy \
+  --template-file infra/shopping.yaml --stack-name donandmartina-shopping \
+  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+  --no-fail-on-empty-changeset --region us-east-1 \
+  --parameter-overrides \
+    UserPoolId="$USER_POOL_ID" \
+    UserPoolClientId="$APP_CLIENT_ID" \
+    ShoppingApiLambdaS3Bucket="$ARTIFACTS_BUCKET" \
+    ShoppingApiLambdaS3ObjectVersion="$SHOPPING_VERSION"
+```
+
+The table has deletion protection and `DeletionPolicy: Retain`; deleting the stack leaves the
+data behind.
 
 ## Job 2 — auth-edge Lambda@Edge + site stack
 
@@ -183,7 +209,16 @@ for p in / /diary/ /callback; do printf '%s -> ' "$p"
   curl -sS -o /dev/null -w '%{http_code}\n' "https://donandmartina.com$p"; done
 ```
 
-Expect 302 everywhere: `/` and `/diary/` to the Cognito hosted UI, `/callback` back to sign-in.
+for p in /shopping/ /api/shopping /token; do printf '%s -> ' "$p"
+  curl -sS -o /dev/null -w '%{http_code}\n' "https://donandmartina.com$p"; done
+```
+
+Expect `/` to return 200 (the public homepage), `/diary/` and `/shopping/` to 302 to the Cognito
+hosted UI, `/callback` to 302 back to sign-in, and `/api/shopping` and `/token` to return 401
+(the API is reachable and checks the session). A 403 from `/api/shopping` means CloudFront
+can't invoke the function URL: check the two `ShoppingApiInvoke*Permission` resources.
+
+```bash
 A **503** means the edge Lambda threw — see below. Full confirmation needs a browser sign-in
 with an allow-listed Google account.
 
@@ -203,7 +238,8 @@ aws cloudfront get-distribution-config --id "$DIST_ID" \
 
 **Reading edge Lambda logs.** They are written in the *edge* region, not `us-east-1`, under
 `/aws/lambda/us-east-1.donandmartina-auth-edge`. For London traffic that is `eu-west-2`. The
-`donandmartina-gha` user cannot read logs; use `AWS_PROFILE=don-root` for diagnostics only.
+shopping API logs to `/aws/lambda/donandmartina-shopping-api` in `us-east-1`. The operator role
+can read both.
 
 **`DELETE_FAILED` on an old Lambda version during cleanup.** Expected and benign — AWS refuses
 to delete a replicated Lambda@Edge version until its replicas drain. The stack still reaches
@@ -218,11 +254,13 @@ retrying. Check `describe-stack-resources` first to confirm nothing live would b
 failed create everything is usually already `DELETE_COMPLETE`.
 
 **Permission errors.** IAM for this account is managed in `~/repos/don-personal-iam`, not by
-hand: `bootstrap.yaml` holds the shared `ServiceUserBoundary` (deployed with `don-root`) and
-`stacks/donandmartina.yaml` the per-project user (deployed with `don-infra`, normally via its
-own GHA). A boundary **caps** effective permissions rather than granting them, so an action must
-appear in both the boundary and the user's own policy — "no permissions boundary allows..."
-means the boundary, plain `AccessDenied` usually means the inline policy.
+hand: `foundation.yaml` holds the shared `ProjectDeploymentBoundary` and
+`ProjectWorkloadBoundary`, and `stacks/donandmartina.yaml` the `donandmartina-deployment`
+policy for the CI and operator roles. Its GHA deploys both. A boundary **caps** effective
+permissions rather than granting them, so an action must appear in both the boundary and the
+role's own policy — "no permissions boundary allows..." means the boundary, plain
+`AccessDenied` usually means the role policy. Runtime roles (Lambda) are capped by
+`ProjectWorkloadBoundary`.
 
 ## Afterwards
 

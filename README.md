@@ -31,6 +31,44 @@ Every other path is passed to `handleGuard(request)`, which means it must have a
 
 To change whether a path is public or protected, update the routing/bypass logic in `infra/lambda/auth/index.js` and add or update the matching tests in `infra/lambda/auth/tests/index.test.js`.
 
+## Sessions
+
+Sign-in sets two HttpOnly cookies: `id_token` (one hour) and `refresh_token`
+(one year, matching the Cognito app client's `RefreshTokenValidity`). When the ID
+token lapses, the auth-edge Lambda exchanges the refresh token at the Cognito
+token endpoint and re-sets `id_token`; pages redirect to themselves to pick it
+up, and `/whoami` and `/token` refresh in place. `/logout` revokes the refresh
+token and clears both cookies. The lifetimes live in `infra/cognito.yaml` and
+`infra/lambda/auth/session.js`; keep them in step.
+
+## Shopping list
+
+`/shopping/` (signed-in only) is a static app backed by the
+`donandmartina-shopping` stack (`infra/shopping.yaml`):
+
+- **Data**: DynamoDB table `donandmartina-shopping`, one partition per cart. The
+  only cart today is `home`.
+- **API**: `infra/lambda/shopping-api`, a Lambda function URL that CloudFront serves
+  at `/api/*` with Lambda origin access control. It verifies the `id_token`
+  cookie itself. `GET /api/shopping` returns every cart. `POST
+  /api/shopping/carts/{cartId}/ops` applies idempotent cart operations
+  (`infra/lambda/shopping-api/cart.js`, mirrored by `static/shopping/model/cart.js`).
+- **Change notifications**: after a write, the API publishes `cart-changed` to
+  `/shopping/{cartId}` on an AppSync Events API. Open pages subscribe with the
+  ID token from `/token` and reload the cart when another tab or device changed it.
+
+The page keeps model and view apart. `static/shopping/model/` holds the data,
+sync, offline queue and realtime code, with no DOM; `static/shopping/view/` renders
+store state and calls store commands; `app.js` wires them together. Changes made
+offline wait in a localStorage queue and are sent when the connection returns.
+
+Tests:
+
+```bash
+node --test tests/shopping/
+(cd infra/lambda/shopping-api && npm test)
+```
+
 ## Authentication allow list
 
 The private `ALLOWED_EMAILS` GitHub Actions secret is the source of truth for the
@@ -48,5 +86,7 @@ Changing a GitHub secret does not trigger a workflow automatically. The dedicate
 workflow updates only the access-configuration stack: it does not package Lambdas,
 deploy Cognito or CloudFront, invalidate the CDN, or publish the site. The Cognito
 trigger reads Parameter Store on every invocation, so the new list applies to the
-next signup or authentication. Existing authenticated sessions remain valid until
-their current token/cookie expires (currently at most one hour).
+next signup or authentication, including every token refresh. Visitors stay
+signed in for up to a year through a refresh-token cookie, but the edge swaps
+it for a new hour-long ID token each hour and Cognito runs the allow-list
+trigger on each swap, so a removed address loses access within an hour.

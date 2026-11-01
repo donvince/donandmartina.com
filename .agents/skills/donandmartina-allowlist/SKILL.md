@@ -117,20 +117,28 @@ a real browser sign-in with the added address.
 
 ## Removing someone who has already signed in
 
-Dropping an address stops *new* sign-ups but does not revoke an existing session or delete the
-Cognito user — the pre-signup hook only fires on first sign-in. To actually lock someone out,
-also delete their user from the pool:
+Sessions last up to a year through a refresh-token cookie, but the allow-list Lambda also runs
+as Cognito's pre token generation trigger, which fires on every hourly token refresh. So once
+the list update has deployed, a removed address loses access when its current hour-long
+`id_token` lapses. To end their sessions sooner, and tidy up, also sign them out everywhere and
+delete their user from the pool:
 
 ```bash
+POOL_ID="$(aws cloudformation describe-stacks --stack-name donandmartina-cognito \
+  --region us-east-1 --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" \
+  --output text)"
+aws cognito-idp admin-user-global-sign-out --region us-east-1 \
+  --user-pool-id "$POOL_ID" --username 'them@example.com'
 aws cognito-idp admin-delete-user --region us-east-1 \
-  --user-pool-id "$(aws cloudformation describe-stacks --stack-name donandmartina-cognito \
-     --region us-east-1 --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" \
-     --output text)" \
-  --username 'them@example.com'
+  --user-pool-id "$POOL_ID" --username 'them@example.com'
 ```
 
-Their existing `id_token` cookie stays valid until it expires (1 hour, set in
-`infra/lambda/auth/callback.js`). Say so rather than implying removal is instant.
+Federated users' Cognito usernames are `Google_<sub>`, not the email; find it with
+`aws cognito-idp list-users --filter 'email = "them@example.com"'` if the email doesn't work.
+
+Their current `id_token` cookie stays valid until it expires (at most 1 hour; see
+`ID_TOKEN_MAX_AGE` in `infra/lambda/auth/session.js`). The shopping API checks the same cookie.
+Say so rather than implying removal is instant.
 
 ## Gotchas
 
