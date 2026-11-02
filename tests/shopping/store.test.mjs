@@ -195,6 +195,21 @@ test("toggles, removes and clears items", async () => {
   assert.deepEqual(server.carts.home.items, []);
 });
 
+test("adding a ticked-off item puts it back", async () => {
+  const { store, server } = makeStore();
+  await store.sync();
+  store.addGroceries(["milk", "eggs"]);
+  const [milk] = store.getState().cart.items;
+  store.toggleItem(milk.id);
+
+  assert.deepEqual(store.addGroceries(["milk", "eggs"]), { added: ["milk"], duplicates: ["eggs"] });
+  assert.equal(store.getState().cart.items.find((item) => item.id === milk.id).checked, false);
+  assert.equal(store.getState().cart.items.length, 2);
+
+  await store.sync();
+  assert.equal(server.carts.home.items.find((item) => item.id === milk.id).checked, false);
+});
+
 test("manages favourites", async () => {
   const { store } = makeStore();
   await store.sync();

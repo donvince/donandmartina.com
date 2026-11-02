@@ -235,18 +235,26 @@ export function createCartStore({
   function addGroceries(names) {
     const added = [];
     const duplicates = [];
-    const existing = new Set(cart.items.map((item) => keyFor(item.name)));
+    const existing = new Map(cart.items.map((item) => [keyFor(item.name), item]));
     const ops = [];
     const createdAt = now();
     for (const value of names) {
       const name = canonicalName(cart.favourites, value);
       if (!name) continue;
       const key = keyFor(name);
-      if (existing.has(key)) {
+      const listed = existing.get(key);
+      // Asking again for something already ticked off puts it back.
+      if (listed?.checked) {
+        existing.set(key, { ...listed, checked: false });
+        ops.push({ type: "setChecked", id: listed.id, checked: false });
+        added.push(name);
+        continue;
+      }
+      if (listed) {
         if (!duplicates.some((item) => keyFor(item) === key)) duplicates.push(name);
         continue;
       }
-      existing.add(key);
+      existing.set(key, { name, checked: false });
       ops.push({ type: "addItem", id: makeId(), name, createdAt: createdAt + added.length });
       added.push(name);
     }
