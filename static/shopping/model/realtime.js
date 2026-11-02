@@ -49,6 +49,8 @@ export function createCartEvents({
   let reconnectTimer = null;
   let keepAliveTimer = null;
   let subscriptionId = 0;
+  // Debug trace of the streaming connection; filter the console on "[realtime]".
+  const debug = (...args) => logger.log?.("[realtime]", ...args);
 
   function clearTimers() {
     if (reconnectTimer) clearTimer(reconnectTimer);
@@ -61,6 +63,7 @@ export function createCartEvents({
     if (stopped || reconnectTimer) return;
     const delay = RECONNECT_DELAYS_MS[Math.min(attempt, RECONNECT_DELAYS_MS.length - 1)];
     attempt += 1;
+    debug(`reconnecting in ${delay}ms (attempt ${attempt})`);
     reconnectTimer = setTimer(() => {
       reconnectTimer = null;
       connect();
@@ -77,6 +80,7 @@ export function createCartEvents({
 
   async function connect() {
     if (stopped || socket) return;
+    debug("connecting: fetching ID token");
     let token;
     try {
       token = await getToken();
@@ -86,10 +90,12 @@ export function createCartEvents({
         logger.warn("shopping: change events paused: signed out");
         return;
       }
+      debug("token fetch failed", error);
       scheduleReconnect();
       return;
     }
     if (stopped || socket) return;
+    debug(`opening websocket to ${realtime.realtimeDomain}, channel ${channel}`);
 
     const authorization = { host: realtime.httpDomain, Authorization: token };
     const ws = new WebSocketImpl(`wss://${realtime.realtimeDomain}/event/realtime`, [
@@ -108,29 +114,45 @@ export function createCartEvents({
       }, keepAliveTimeout);
     }
 
-    ws.addEventListener("open", () => ws.send(JSON.stringify({ type: "connection_init" })));
+    ws.addEventListener("open", () => {
+      debug("websocket open; sending connection_init");
+      ws.send(JSON.stringify({ type: "connection_init" }));
+    });
     ws.addEventListener("message", ({ data }) => {
       let message;
-      try { message = JSON.parse(data); } catch (_error) { return; }
+      try { message = JSON.parse(data); } catch (_error) {
+        debug("ignoring non-JSON message", data);
+        return;
+      }
+      if (message.type !== "ka") debug(`<- ${message.type}`, message);
       switch (message.type) {
         case "connection_ack":
           keepAliveTimeout = message.connectionTimeoutMs || DEFAULT_KEEPALIVE_TIMEOUT_MS;
           armKeepAlive();
           subscriptionId += 1;
+          debug(`connection acked (keep-alive timeout ${keepAliveTimeout}ms); subscribing as cart-${subscriptionId}`);
           ws.send(JSON.stringify({ type: "subscribe", id: `cart-${subscriptionId}`, channel, authorization }));
           break;
         case "ka":
+          debug("<- ka (keep-alive)");
           armKeepAlive();
           break;
         case "subscribe_success":
           attempt = 0;
+          debug(subscribedBefore ? "subscribed again; reloading to catch missed changes" : "subscribed; waiting for events");
           // Anything published while disconnected was missed.
           if (subscribedBefore) onReconnect();
           subscribedBefore = true;
           break;
         case "data":
           for (const event of parseEventPayloads(message.event)) {
-            if (event.type === "cart-changed" && event.cartId === cartId && event.source !== clientId) onChange();
+            if (event.type !== "cart-changed") debug("ignoring event: not cart-changed", event);
+            else if (event.cartId !== cartId) debug(`ignoring event: for cart ${event.cartId}, not ${cartId}`, event);
+            else if (event.source === clientId) debug("ignoring event: caused by this tab", event);
+            else {
+              debug(`cart changed by ${event.source}; reloading`, event);
+              onChange();
+            }
           }
           break;
         case "subscribe_error":
@@ -144,7 +166,8 @@ export function createCartEvents({
           break;
       }
     });
-    ws.addEventListener("close", () => {
+    ws.addEventListener("close", ({ code, reason } = {}) => {
+      debug(`websocket closed (code ${code}${reason ? `, ${reason}` : ""})${socket === ws ? "" : " after being dropped"}`);
       if (socket !== ws) return;
       socket = null;
       if (keepAliveTimer) clearTimer(keepAliveTimer);
@@ -157,16 +180,19 @@ export function createCartEvents({
     start() {
       if (!stopped) return;
       stopped = false;
+      debug(`starting; this tab is ${clientId}`);
       connect();
     },
     stop() {
       stopped = true;
+      debug("stopping");
       clearTimers();
       drop();
     },
     // Reconnect straight away if disconnected (e.g. the network came back).
     nudge() {
       if (stopped || socket) return;
+      debug("nudged; reconnecting now");
       if (reconnectTimer) clearTimer(reconnectTimer);
       reconnectTimer = null;
       attempt = 0;
