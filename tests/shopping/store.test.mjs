@@ -179,7 +179,7 @@ test("retries after a server error", async () => {
   assert.equal(timers.length, 1);
 });
 
-test("toggles, removes and clears items", async () => {
+test("toggles and removes items", async () => {
   const { store, server } = makeStore();
   await store.sync();
   store.addGroceries(["milk", "eggs"]);
@@ -187,7 +187,7 @@ test("toggles, removes and clears items", async () => {
 
   store.toggleItem(milk.id);
   assert.equal(store.getState().cart.items[0].checked, true);
-  assert.equal(store.clearCompleted(), 1);
+  assert.deepEqual(store.removeItem(milk.id).name, "milk");
   assert.deepEqual(store.removeItem(eggs.id).name, "eggs");
   assert.equal(store.removeItem("missing"), null);
 

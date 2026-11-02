@@ -273,12 +273,6 @@ export function createCartStore({
     return item || null;
   }
 
-  function clearCompleted() {
-    const done = cart.items.filter((item) => item.checked);
-    if (done.length) change(done.map((item) => ({ type: "removeItem", id: item.id })));
-    return done.length;
-  }
-
   function tooLong(favourite) {
     return favourite.name.length > MAX_NAME_LENGTH
       || favourite.aliases.length > MAX_ALIASES
@@ -327,7 +321,6 @@ export function createCartStore({
     addGroceries,
     toggleItem,
     removeItem,
-    clearCompleted,
     addFavourite,
     updateFavourite,
     removeFavourite,

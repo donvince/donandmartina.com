@@ -154,15 +154,8 @@ export function createListView({ elements, store, showToast }) {
         closeMenu();
       }
     }
-    const completed = cart.items.filter((item) => item.checked).length;
     if (elements.emptyList) elements.emptyList.hidden = cart.items.length > 0;
-    if (elements.clearCompletedButton) elements.clearCompletedButton.hidden = completed === 0;
   }
-
-  elements.clearCompletedButton?.addEventListener("click", () => {
-    const count = store.clearCompleted();
-    if (count) showToast(`Cleared ${count} completed item${count === 1 ? "" : "s"}`);
-  });
 
   store.subscribe(render);
   render();

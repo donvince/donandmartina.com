@@ -17,7 +17,7 @@ import { createModelStatus, createSyncStatusView } from "./view/status-view.js";
 
 const elements = getElements([
   "composerForm", "messageInput", "micButton", "sendButton", "recognitionPreview", "inputFeedback",
-  "shoppingList", "clearCompletedButton", "emptyList", "itemMenu", "itemMenuDone",
+  "shoppingList", "emptyList", "itemMenu", "itemMenuDone",
   "itemMenuDoneLabel", "itemMenuDelete", "allowListDialog",
   "openAllowListButton", "closeAllowListButton", "allowListForm",
   "allowItemInput", "addFavouriteButton", "allowListError", "allowListItems", "resetAllowListButton", "toast", "modelStatus",
