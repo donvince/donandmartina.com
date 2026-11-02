@@ -4,8 +4,6 @@ export function getElements(ids) {
   return Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
 }
 
-export const TRASH_ICON = '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3M8 7l1 13h6l1-13M10 11v5M14 11v5" /></svg>';
-
 export function createToast(element) {
   let timer = null;
   return function showToast(message) {
