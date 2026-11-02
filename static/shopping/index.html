@@ -36,117 +36,50 @@
         <span id="modelStatusText">Getting the local helper ready…</span>
       </div>
 
-      <nav class="tab-list" aria-label="Grocery list views" role="tablist">
-        <button
-          id="addTab"
-          class="tab-button is-active"
-          type="button"
-          role="tab"
-          aria-selected="true"
-          aria-controls="addView"
-        >
-          Add
-        </button>
-        <button
-          id="shopTab"
-          class="tab-button"
-          type="button"
-          role="tab"
-          aria-selected="false"
-          aria-controls="shopView"
-          tabindex="-1"
-        >
-          Shop
-          <span id="activeCount" class="count-badge" aria-label="0 items">0</span>
-        </button>
-      </nav>
-
-      <section
-        id="addView"
-        class="view add-view"
-        role="tabpanel"
-        aria-labelledby="addTab"
-      >
-        <h2 class="visually-hidden">Add groceries</h2>
-
-        <section class="add-list" aria-labelledby="addListTitle">
-          <header class="add-list__header">
-            <p class="section-label">Current list</p>
-            <h2 id="addListTitle">Your groceries</h2>
-          </header>
-          <p id="addListEmpty" class="add-list__empty">
-            Add something below to start your list.
-          </p>
-          <div id="recognitionPreview" class="recognition-preview" aria-live="polite" aria-label="Recognition result" hidden></div>
-          <ul id="addList" class="add-list__items" aria-live="polite"></ul>
-        </section>
-
-        <div class="composer-wrap">
-          <div id="inputFeedback" class="input-feedback" role="status" aria-live="polite" hidden></div>
-          <p id="listeningStatus" class="listening-status" aria-live="polite" hidden>
-            <span class="listening-status__dot" aria-hidden="true"></span>
-            Listening <span id="interimTranscript"></span>
-          </p>
-          <form id="composerForm" class="composer">
-            <label class="visually-hidden" for="messageInput">Groceries to add</label>
-            <input
-              id="messageInput"
-              name="message"
-              type="text"
-              autocomplete="off"
-              enterkeyhint="send"
-              placeholder="Add milk, bread…"
-              aria-describedby="composerHint"
-            />
-            <button
-              id="micButton"
-              class="composer__button mic-button"
-              type="button"
-              aria-label="Start voice input"
-              aria-pressed="false"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <rect x="9" y="3" width="6" height="11" rx="3" />
-                <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" />
-              </svg>
-            </button>
-            <button id="sendButton" class="composer__button send-button" type="submit" aria-label="Add groceries">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path d="m5 12 14-7-4.5 14-2.7-5.2L5 12Z" />
-                <path d="m11.8 13.8 3.7-3.7" />
-              </svg>
-            </button>
-          </form>
-          <p id="composerHint" class="composer-hint">Type or speak. Your list syncs across your devices.</p>
-        </div>
+      <section class="list-panel" aria-labelledby="listTitle">
+        <h2 id="listTitle" class="visually-hidden">Your groceries</h2>
+        <p id="emptyList" class="empty-list">Add something below to start your list.</p>
+        <ul id="shoppingList" class="shopping-list" aria-live="polite"></ul>
+        <button id="clearCompletedButton" class="text-button" type="button" hidden>Clear done</button>
       </section>
 
-      <section
-        id="shopView"
-        class="view shop-view"
-        role="tabpanel"
-        aria-labelledby="shopTab"
-        hidden
-      >
-        <div class="shop-heading">
-          <div>
-            <p class="section-label">In the supermarket</p>
-            <h2><span id="remainingCount">0</span> left to pick up</h2>
-          </div>
-          <button id="clearCompletedButton" class="text-button" type="button" disabled>
-            Clear done
+      <div class="composer-wrap">
+        <div id="recognitionPreview" class="recognition-preview" aria-live="polite" aria-label="Recognition result" hidden></div>
+        <div id="inputFeedback" class="input-feedback" role="status" aria-live="polite" hidden></div>
+        <p id="listeningStatus" class="listening-status" aria-live="polite" hidden>
+          <span class="listening-status__dot" aria-hidden="true"></span>
+          Listening <span id="interimTranscript"></span>
+        </p>
+        <form id="composerForm" class="composer">
+          <label class="visually-hidden" for="messageInput">Groceries to add</label>
+          <input
+            id="messageInput"
+            name="message"
+            type="text"
+            autocomplete="off"
+            enterkeyhint="send"
+            placeholder="Add milk, bread…"
+          />
+          <button
+            id="micButton"
+            class="composer__button mic-button"
+            type="button"
+            aria-label="Start voice input"
+            aria-pressed="false"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M9 21h6" />
+            </svg>
           </button>
-        </div>
-
-        <div id="emptyList" class="empty-list">
-          <div class="empty-list__icon" aria-hidden="true">✓</div>
-          <h3>Your list is empty</h3>
-          <p>Add a few groceries and they’ll appear here.</p>
-          <button id="emptyAddButton" class="primary-button" type="button">Add groceries</button>
-        </div>
-
-        <ul id="shoppingList" class="shopping-list" aria-label="Shopping list"></ul>
-      </section>
+          <button id="sendButton" class="composer__button send-button" type="submit" aria-label="Add groceries">
+            <svg aria-hidden="true" viewBox="0 0 24 24">
+              <path d="m5 12 14-7-4.5 14-2.7-5.2L5 12Z" />
+              <path d="m11.8 13.8 3.7-3.7" />
+            </svg>
+          </button>
+        </form>
+      </div>
     </main>
 
     <dialog id="allowListDialog" class="allow-list-dialog" aria-labelledby="allowListTitle">

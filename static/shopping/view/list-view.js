@@ -1,5 +1,4 @@
-// The list itself, in both tabs: "Add" shows it compactly, "Shop" lets you
-// tick items off.
+// The list: tap an item to tick it off, or remove it.
 
 import { sortItems } from "../model/groceries.js";
 import { TRASH_ICON, button } from "./dom.js";
@@ -10,10 +9,10 @@ export function createListView({ elements, store, showToast }) {
     if (item) showToast(`${item.name} removed`);
   }
 
-  function shopRow(item) {
-    const row = document.createElement("li");
-    row.className = `shopping-item${item.checked ? " is-complete" : ""}`;
-    row.dataset.itemId = item.id;
+  function row(item) {
+    const li = document.createElement("li");
+    li.className = `shopping-item${item.checked ? " is-complete" : ""}`;
+    li.dataset.itemId = item.id;
 
     const toggle = button({
       className: "shopping-item__toggle",
@@ -30,46 +29,21 @@ export function createListView({ elements, store, showToast }) {
     name.textContent = item.name;
     toggle.append(check, name);
 
-    row.append(toggle, button({
+    li.append(toggle, button({
       className: "shopping-item__remove",
       label: `Remove ${item.name}`,
       html: TRASH_ICON,
       onClick: () => remove(item.id),
     }));
-    return row;
-  }
-
-  function addRow(item) {
-    const row = document.createElement("li");
-    row.className = `add-list-item${item.checked ? " is-complete" : ""}`;
-    const name = document.createElement("span");
-    name.className = "add-list-item__name";
-    name.textContent = item.name;
-    row.append(name, button({
-      className: "add-list-item__remove",
-      label: `Remove ${item.name}`,
-      html: TRASH_ICON,
-      onClick: () => remove(item.id),
-    }));
-    return row;
+    return li;
   }
 
   function render() {
     const { cart } = store.getState();
-    const sorted = sortItems(cart.items);
-    elements.shoppingList?.replaceChildren(...sorted.map(shopRow));
-    elements.addList?.replaceChildren(...sorted.map(addRow));
-
-    const remaining = cart.items.filter((item) => !item.checked).length;
-    const completed = cart.items.length - remaining;
-    if (elements.activeCount) {
-      elements.activeCount.textContent = String(remaining);
-      elements.activeCount.setAttribute("aria-label", `${remaining} item${remaining === 1 ? "" : "s"} remaining`);
-    }
-    if (elements.remainingCount) elements.remainingCount.textContent = String(remaining);
-    if (elements.addListEmpty) elements.addListEmpty.hidden = cart.items.length > 0;
+    elements.shoppingList?.replaceChildren(...sortItems(cart.items).map(row));
+    const completed = cart.items.filter((item) => item.checked).length;
     if (elements.emptyList) elements.emptyList.hidden = cart.items.length > 0;
-    if (elements.clearCompletedButton) elements.clearCompletedButton.disabled = completed === 0;
+    if (elements.clearCompletedButton) elements.clearCompletedButton.hidden = completed === 0;
   }
 
   elements.clearCompletedButton?.addEventListener("click", () => {

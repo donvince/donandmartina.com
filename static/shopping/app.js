@@ -16,9 +16,8 @@ import { createListView } from "./view/list-view.js";
 import { createModelStatus, createSyncStatusView } from "./view/status-view.js";
 
 const elements = getElements([
-  "addTab", "shopTab", "addView", "shopView", "composerForm", "messageInput",
-  "micButton", "sendButton", "addList", "addListEmpty", "recognitionPreview", "inputFeedback", "activeCount", "shoppingList",
-  "remainingCount", "clearCompletedButton", "emptyList", "emptyAddButton", "allowListDialog",
+  "composerForm", "messageInput", "micButton", "sendButton", "recognitionPreview", "inputFeedback",
+  "shoppingList", "clearCompletedButton", "emptyList", "allowListDialog",
   "openAllowListButton", "closeAllowListButton", "allowListForm",
   "allowItemInput", "addFavouriteButton", "allowListError", "allowListItems", "resetAllowListButton", "toast", "modelStatus",
   "modelStatusText", "listeningStatus", "interimTranscript", "syncStatus",
@@ -51,23 +50,6 @@ createFavouritesView({ elements, store, showToast });
 createSyncStatusView({ elements, store, showToast });
 composer = createComposerView({ elements, store, groceryModel, setModelStatus, showToast });
 
-function selectView(view) {
-  const shopping = view === "shop";
-  if (elements.addView) elements.addView.hidden = shopping;
-  if (elements.shopView) elements.shopView.hidden = !shopping;
-  elements.addTab?.setAttribute("aria-selected", String(!shopping));
-  elements.shopTab?.setAttribute("aria-selected", String(shopping));
-  if (elements.addTab) elements.addTab.tabIndex = shopping ? -1 : 0;
-  if (elements.shopTab) elements.shopTab.tabIndex = shopping ? 0 : -1;
-  elements.addTab?.classList.toggle("is-active", !shopping);
-  elements.shopTab?.classList.toggle("is-active", shopping);
-  if (!shopping) elements.messageInput?.focus();
-}
-
-elements.addTab?.addEventListener("click", () => selectView("add"));
-elements.shopTab?.addEventListener("click", () => selectView("shop"));
-elements.emptyAddButton?.addEventListener("click", () => selectView("add"));
-
 // ── Sync ────────────────────────────────────────────────────────────────────
 // Load everything now; reload when another device changes the cart (an
 // AppSync Events notification), and catch up whenever the connection returns
@@ -98,5 +80,4 @@ document.addEventListener("visibilitychange", () => {
   cartEvents?.nudge();
 });
 
-selectView("add");
 groceryModel.start();
