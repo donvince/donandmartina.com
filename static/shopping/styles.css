@@ -161,7 +161,7 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 .list-panel {
   flex: 1 1 auto;
   min-height: 0;
-  padding: calc(8px + env(safe-area-inset-top)) 14px 10px;
+  padding: calc(6px + env(safe-area-inset-top)) 10px 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -207,7 +207,7 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 
 .text-button:hover:not(:disabled) { color: var(--green-dark); text-decoration: underline; }
 
-.composer-wrap { position: relative; padding: 0 14px calc(10px + env(safe-area-inset-bottom)); }
+.composer-wrap { position: relative; padding: 0 10px calc(10px + env(safe-area-inset-bottom)); }
 
 .input-feedback {
   display: flex;
@@ -296,25 +296,25 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 .listening-status__dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
 #interimTranscript { overflow: hidden; color: var(--muted); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
 
-.shopping-list { display: grid; gap: 4px; padding: 0; margin: 0; list-style: none; }
+.shopping-list { display: grid; gap: 2px; padding: 0; margin: 0; list-style: none; }
 
 .shopping-item {
   display: grid;
-  grid-template-columns: 1fr 44px;
+  grid-template-columns: 1fr 40px;
   align-items: stretch;
-  min-height: 44px;
+  min-height: 36px;
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .shopping-item__toggle {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
-  padding: 6px 12px;
+  padding: 3px 10px;
   text-align: left;
   background: transparent;
   border: 0;
@@ -325,16 +325,16 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   color: transparent;
   border: 2px solid #99a39d;
   border-radius: 50%;
-  font-size: 0.85rem;
+  font-size: 0.7rem;
   font-weight: 900;
 }
 
-.shopping-item__name { overflow: hidden; font-size: 1rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.shopping-item__name { overflow: hidden; font-size: 0.95rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 
 .shopping-item__remove {
   display: grid;
