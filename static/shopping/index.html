@@ -10,22 +10,21 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="app-header">
-        <h1 class="visually-hidden">Groceries</h1>
-        <p id="syncStatus" class="sync-status" role="status" aria-live="polite">Loading your list…</p>
-        <button
-          id="openAllowListButton"
-          class="icon-button"
-          type="button"
-          aria-label="Manage favourites"
-          aria-haspopup="dialog"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M4 6h16M4 12h16M4 18h10" />
-            <circle cx="18" cy="18" r="2" />
-          </svg>
-        </button>
-      </header>
+      <h1 class="visually-hidden">Groceries</h1>
+      <button
+        id="openAllowListButton"
+        class="icon-button menu-button"
+        type="button"
+        aria-label="Manage favourites"
+        aria-haspopup="dialog"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24">
+          <path d="M4 6h16M4 12h16M4 18h10" />
+          <circle cx="18" cy="18" r="2" />
+        </svg>
+      </button>
+
+      <p id="syncStatus" class="sync-status" role="status" aria-live="polite">Loading your list…</p>
 
       <section class="list-panel" aria-labelledby="listTitle">
         <h2 id="listTitle" class="visually-hidden">Your groceries</h2>

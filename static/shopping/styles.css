@@ -63,17 +63,10 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
   width: min(100%, 680px);
   height: 100vh;
   height: 100dvh;
+  position: relative;
   margin: 0 auto;
   background: rgba(255, 253, 248, 0.72);
   border-inline: 1px solid rgba(217, 213, 202, 0.72);
-}
-
-.app-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: calc(10px + env(safe-area-inset-top)) 14px 4px;
 }
 
 .section-label {
@@ -106,11 +99,18 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 }
 
 .icon-button:hover { background: var(--green-soft); }
+
+.menu-button {
+  position: absolute;
+  z-index: 2;
+  top: calc(8px + env(safe-area-inset-top));
+  right: 10px;
+  box-shadow: 0 4px 14px rgba(35, 49, 42, 0.14);
+}
 .icon-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 1.8; }
 
 .sync-status {
-  flex: 1 1 auto;
-  margin: 0;
+  margin: calc(8px + env(safe-area-inset-top)) 58px 0 14px;
   padding: 8px 12px;
   color: var(--ink);
   background: var(--surface-soft);
@@ -161,7 +161,7 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 .list-panel {
   flex: 1 1 auto;
   min-height: 0;
-  padding: 4px 14px 10px;
+  padding: calc(8px + env(safe-area-inset-top)) 14px 10px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
