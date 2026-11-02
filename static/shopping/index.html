@@ -11,10 +11,8 @@
   <body>
     <main class="app-shell">
       <header class="app-header">
-        <div>
-          <p class="eyebrow">Home list</p>
-          <h1>Groceries</h1>
-        </div>
+        <h1 class="visually-hidden">Groceries</h1>
+        <p id="syncStatus" class="sync-status" role="status" aria-live="polite">Loading your list…</p>
         <button
           id="openAllowListButton"
           class="icon-button"
@@ -28,13 +26,6 @@
           </svg>
         </button>
       </header>
-
-      <p id="syncStatus" class="sync-status" role="status" aria-live="polite">Loading your list…</p>
-
-      <div id="modelStatus" class="model-status" role="status" aria-live="polite">
-        <span class="model-status__dot" aria-hidden="true"></span>
-        <span id="modelStatusText">Getting the local helper ready…</span>
-      </div>
 
       <section class="list-panel" aria-labelledby="listTitle">
         <h2 id="listTitle" class="visually-hidden">Your groceries</h2>
@@ -51,6 +42,10 @@
           Listening <span id="interimTranscript"></span>
         </p>
         <form id="composerForm" class="composer">
+          <div id="modelStatus" class="model-status" role="status" aria-live="polite">
+            <span class="model-status__dot" aria-hidden="true"></span>
+            <span id="modelStatusText" class="visually-hidden">Getting the local helper ready…</span>
+          </div>
           <label class="visually-hidden" for="messageInput">Groceries to add</label>
           <input
             id="messageInput"
@@ -58,7 +53,7 @@
             type="text"
             autocomplete="off"
             enterkeyhint="send"
-            placeholder="Add milk, bread…"
+            placeholder="Loading grocery model…"
           />
           <button
             id="micButton"
