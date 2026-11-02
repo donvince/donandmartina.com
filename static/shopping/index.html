@@ -42,10 +42,6 @@
           Listening <span id="interimTranscript"></span>
         </p>
         <form id="composerForm" class="composer">
-          <div id="modelStatus" class="model-status" role="status" aria-live="polite">
-            <span class="model-status__dot" aria-hidden="true"></span>
-            <span id="modelStatusText" class="visually-hidden">Getting the local helper ready…</span>
-          </div>
           <label class="visually-hidden" for="messageInput">Groceries to add</label>
           <input
             id="messageInput"
@@ -53,7 +49,7 @@
             type="text"
             autocomplete="off"
             enterkeyhint="send"
-            placeholder="Loading grocery model…"
+            placeholder="Add milk, bread…"
           />
           <button
             id="micButton"
@@ -74,6 +70,10 @@
             </svg>
           </button>
         </form>
+        <p id="modelStatus" class="model-status" role="status" aria-live="polite">
+          <span class="model-status__dot" aria-hidden="true"></span>
+          <span id="modelStatusText">Loading grocery model…</span>
+        </p>
       </div>
     </main>
 

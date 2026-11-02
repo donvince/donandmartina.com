@@ -131,9 +131,21 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 
 .sync-status a { color: var(--green-dark); font-weight: 750; }
 
-.model-status { display: grid; place-items: center; width: 14px; }
+.model-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 4px 0;
+  color: var(--muted);
+  font-size: 0.69rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+#modelStatusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .model-status__dot {
+  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -222,10 +234,10 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 
 .composer {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) 42px 42px;
+  grid-template-columns: minmax(0, 1fr) 42px 42px;
   align-items: center;
   gap: 6px;
-  padding: 4px 4px 4px 10px;
+  padding: 4px 4px 4px 12px;
   background: var(--surface);
   border: 1px solid #cbc6b9;
   border-radius: 18px;
@@ -444,7 +456,7 @@ button:disabled { cursor: not-allowed; opacity: 0.48; }
 }
 
 @media (max-width: 360px) {
-  .composer { grid-template-columns: 14px minmax(0, 1fr) 40px 40px; gap: 4px; }
+  .composer { grid-template-columns: minmax(0, 1fr) 40px 40px; gap: 4px; }
   .composer__button { width: 40px; height: 40px; }
   .composer input { font-size: 0.92rem; }
 }

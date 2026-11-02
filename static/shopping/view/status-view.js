@@ -1,13 +1,14 @@
-// Status lines: the grocery model's readiness (a dot in the composer, with
-// the message as the input's placeholder until it's ready) and whether the
-// list is in step with the server.
+// Status lines: the grocery model's readiness (the line under the composer,
+// which shows a hint once the model is ready) and whether the list is in
+// step with the server.
 
 import { signInUrl } from "../model/session.js";
 
+const READY_HINT = "Type or speak. Your list syncs across your devices.";
+
 export function createModelStatus(elements) {
   return function setModelStatus(message, kind = "loading") {
-    if (elements.modelStatusText) elements.modelStatusText.textContent = message;
-    if (elements.messageInput) elements.messageInput.placeholder = kind === "ready" ? "Add milk, bread…" : message;
+    if (elements.modelStatusText) elements.modelStatusText.textContent = kind === "ready" ? READY_HINT : message;
     if (elements.modelStatus) {
       elements.modelStatus.dataset.state = kind;
       elements.modelStatus.classList.toggle("is-ready", kind === "ready");
